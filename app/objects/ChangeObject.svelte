@@ -11,6 +11,7 @@
     import { changeSelectEvent, repoConfigEvent } from "../stores";
     import { mutate } from "../ipc";
     import ActionLink from "../controls/ActionLink.svelte";
+    import { fileChangeLabel } from "../vocabulary";
 
     export let headers: RevHeader[] | null;
     export let change: RevChange;
@@ -20,23 +21,6 @@
 
     $: hasDiffTool = $repoConfigEvent.type === "Workspace" && $repoConfigEvent.has_external_diff_tool;
     $: hasMergeTool = $repoConfigEvent.type === "Workspace" && $repoConfigEvent.has_external_merge_tool;
-
-    let icon = "file";
-    let state: "add" | "change" | "remove" | null = null;
-    switch (change.kind) {
-        case "Added":
-            icon = "file-plus";
-            state = "add";
-            break;
-        case "Deleted":
-            icon = "file-minus";
-            state = "remove";
-            break;
-        case "Modified":
-            icon = "file";
-            state = "change";
-            break;
-    }
 
     function onSelect() {
         changeSelectEvent.set(change);
@@ -70,14 +54,19 @@
     let:hint>
     <Zone {operand} let:target>
         <div class="layout" class:target>
-            <Icon name={icon} state={context ? null : state} />
-            <span>{hint ?? change.path.relative_path}</span>
+            <span class="kind {change.has_conflict ? "danger" : change.kind.toLowerCase()}">
+                {change.has_conflict ? "冲突" : fileChangeLabel(change.kind)}
+            </span>
+            <span class="path">{hint ?? change.path.relative_path}</span>
+            {#if change.has_conflict}
+                <span class="flag">有冲突</span>
+            {/if}
             {#if hasMergeTool && change.has_conflict && operand}
-                <ActionWidget tip="resolve in merge tool" onClick={onExternalResolve}>
-                    <Icon name="external-link" /> Resolve
+                <ActionWidget tip="用合并工具解决" onClick={onExternalResolve}>
+                    <Icon name="external-link" /> 解决
                 </ActionWidget>
             {:else if hasDiffTool && operand}
-                <ActionLink tip="open in diff tool" onClick={onExternalDiff}>
+                <ActionLink tip="在差异工具里打开" onClick={onExternalDiff}>
                     <Icon name="external-link" />
                 </ActionLink>
             {/if}
@@ -87,15 +76,56 @@
 
 <style>
     .layout {
-        height: 30px;
+        min-height: 30px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         padding-left: 3px;
     }
 
-    .layout span {
+    .kind {
+        font-size: 11.5px;
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: var(--radius-small);
+        background: var(--ctp-surface0);
+        color: var(--ctp-text);
+        flex: none;
+    }
+
+    .kind.added {
+        background: rgba(64, 160, 43, 0.16);
+        color: var(--tag-ok);
+    }
+
+    .kind.deleted {
+        background: rgba(210, 15, 57, 0.16);
+        color: var(--tag-danger);
+    }
+
+    .kind.modified {
+        background: rgba(30, 102, 245, 0.14);
+        color: var(--tag-info);
+    }
+
+    .kind.danger {
+        background: rgba(210, 15, 57, 0.16);
+        color: var(--tag-danger);
+    }
+
+    .path {
         flex: 1;
+        font-family: var(--stack-code);
+        font-size: 12.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .flag {
+        font-size: 11.5px;
+        color: var(--tag-danger);
+        flex: none;
     }
 
     .layout.target {

@@ -17,17 +17,17 @@
         font-family: var(--stack-code);
         font-size: smaller;
 
-        height: 24px;
+        height: var(--height-compact);
         line-height: 16px;
 
         display: flex;
         align-items: center;
         border: 1px solid var(--ctp-overlay1);
-        border-radius: 12px;
-        padding: 0 6px;
+        border-radius: var(--radius-control);
+        padding: 0 8px;
         background: var(--ctp-mantle);
         white-space: nowrap;
-        gap: 3px;
+        gap: 4px;
     }
 
     .context {
@@ -36,8 +36,8 @@
     }
 
     .target {
-        background: var(--ctp-flamingo);
-        color: black;
+        background: var(--ctp-blue);
+        color: white;
     }
 
     .disconnected {

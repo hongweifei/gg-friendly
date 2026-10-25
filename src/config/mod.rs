@@ -163,6 +163,12 @@ pub fn resolve_repo_path(dir: Option<&Path>) -> Option<PathBuf> {
 /// user config, and (when `repo_path` is `Some`) repo-level config. Any
 /// non-native `gg.*` keys are extracted as jj overrides (see module docs).
 ///
+/// `config_env` may be passed in by a caller that has already resolved the
+/// repository's config file. jj picks a random per-repository config id the
+/// first time it needs one, and caches it in that `ConfigEnv`; a second,
+/// separate `ConfigEnv` would pick a different id and read an empty file.
+/// Writing config and reading it back therefore share one `ConfigEnv`.
+///
 /// Returns `(settings, revset_aliases, preset_query_choices)`.
 pub fn read_config(
     repo_path: Option<&Path>,
@@ -172,8 +178,20 @@ pub fn read_config(
     FilesetAliasesMap,
     HashMap<String, String>,
 )> {
+    read_config_with_env(&mut ConfigEnv::from_environment(), repo_path)
+}
+
+/// The same as [`read_config`], but with a caller-provided [`ConfigEnv`].
+pub fn read_config_with_env(
+    config_env: &mut ConfigEnv,
+    repo_path: Option<&Path>,
+) -> Result<(
+    UserSettings,
+    RevsetAliasesMap,
+    FilesetAliasesMap,
+    HashMap<String, String>,
+)> {
     let mut layers = vec![];
-    let mut config_env = ConfigEnv::from_environment();
 
     let default_layers = default_config_layers();
     let gg_layer = ConfigLayer::parse(ConfigSource::Default, include_str!("../config/gg.toml"))?;

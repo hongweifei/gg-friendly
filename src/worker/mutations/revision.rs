@@ -41,9 +41,9 @@ impl Mutation for AbandonRevisions {
         let (commits, is_immutable) = ws.resolve_change_set(&self.set, true)?;
         if is_immutable && !options.ignore_immutable {
             if commits.len() == 1 {
-                precondition!("Revision is immutable");
+                precondition!("这个改动已经定稿，不能修改");
             } else {
-                precondition!("Some revisions are immutable");
+                precondition!("有些改动已经定稿，不能修改");
             }
         }
 
@@ -57,10 +57,10 @@ impl Mutation for AbandonRevisions {
         tx.repo_mut().rebase_descendants().await?;
 
         let transaction_description = if commits.len() == 1 {
-            format!("abandon commit {}", commits[0].id().hex())
+            format!("放弃改动 {}", commits[0].id().hex())
         } else {
             format!(
-                "abandon commit {} and {} more",
+                "放弃改动 {}，以及另外 {} 个",
                 commits[0].id().hex(),
                 commits.len() - 1
             )
@@ -98,11 +98,11 @@ impl Mutation for AdoptRevision {
             .collect::<std::collections::HashSet<_>>()
             .len();
         if unique_count != parent_ids.len() {
-            precondition!("Duplicate parent IDs");
+            precondition!("重复的上级改动");
         }
 
         if ws.check_immutable(vec![target.id().clone()])? && !options.ignore_immutable {
-            precondition!("Revision {} is immutable", self.id.change.prefix);
+            precondition!("改动 {} 已经定稿，不能修改", self.id.change.prefix);
         }
 
         // just rebase the target, which will also rebase its descendants
@@ -110,7 +110,7 @@ impl Mutation for AdoptRevision {
         rewrite::rebase_commit(tx.repo_mut(), target, parent_ids).await?;
 
         match ws
-            .finish_transaction(tx, format!("rebase commit {}", rebased_id))
+            .finish_transaction(tx, format!("移动改动 {}", rebased_id))
             .await?
         {
             Some(new_status) => Ok(MutationResult::Updated {
@@ -195,10 +195,10 @@ impl Mutation for BackoutRevisions {
             .await?;
 
         let transaction_description = if commits.len() == 1 {
-            format!("back out commit {}", newest.id().hex())
+            format!("把改动内容恢复到工作副本 {}", newest.id().hex())
         } else {
             format!(
-                "back out commit {} and {} more",
+                "把改动内容恢复到工作副本 {}，以及另外 {} 个",
                 newest.id().hex(),
                 commits.len() - 1
             )
@@ -226,7 +226,7 @@ impl Mutation for CheckoutRevision {
         let edited = ws.resolve_change_id(&self.id)?;
 
         if ws.check_immutable(vec![edited.id().clone()])? && !options.ignore_immutable {
-            precondition!("Revision is immutable");
+            precondition!("这个改动已经定稿，不能修改");
         }
 
         if edited.id() == ws.wc_id() {
@@ -238,7 +238,7 @@ impl Mutation for CheckoutRevision {
         match ws
             .finish_transaction_for_edit(
                 tx,
-                format!("edit commit {}", edited.id().hex()),
+                format!("切换到改动 {}", edited.id().hex()),
                 options.ignore_immutable,
             )
             .await?
@@ -280,7 +280,7 @@ impl Mutation for CreateRevision {
             .edit(ws.name().to_owned(), &new_commit)
             .await?;
 
-        match ws.finish_transaction(tx, "new empty commit").await? {
+        match ws.finish_transaction(tx, "新建空改动").await? {
             Some(new_status) => {
                 let new_selection = Some(ws.format_header(&new_commit, Some(false))?);
                 Ok(MutationResult::Updated {
@@ -319,7 +319,7 @@ impl Mutation for CreateRevisionBetween {
             .resolve_change_id(&self.before_id)
             .context("resolve before_id")?;
         if ws.check_immutable(vec![before_commit.id().clone()])? && !options.ignore_immutable {
-            precondition!("'Before' revision is immutable");
+            precondition!("后面的改动已经定稿，不能修改");
         }
 
         rewrite::rebase_commit(tx.repo_mut(), before_commit, vec![new_commit.id().clone()]).await?;
@@ -328,7 +328,7 @@ impl Mutation for CreateRevisionBetween {
             .edit(ws.name().to_owned(), &new_commit)
             .await?;
 
-        match ws.finish_transaction(tx, "new empty commit").await? {
+        match ws.finish_transaction(tx, "新建空改动").await? {
             Some(new_status) => {
                 let new_selection = Some(ws.format_header(&new_commit, Some(false))?);
                 Ok(MutationResult::Updated {
@@ -353,7 +353,7 @@ impl Mutation for DescribeRevision {
         let described = ws.resolve_change_id(&self.id)?;
 
         if ws.check_immutable(vec![described.id().clone()])? && !options.ignore_immutable {
-            precondition!("Revision {} is immutable", self.id.change.prefix);
+            precondition!("改动 {} 已经定稿，不能修改", self.id.change.prefix);
         }
 
         if self.new_description == described.description() && !self.reset_author {
@@ -365,14 +365,14 @@ impl Mutation for DescribeRevision {
             let missing_email = ws.data.workspace_settings.user_email().is_empty();
             if missing_name || missing_email {
                 let field = match (missing_name, missing_email) {
-                    (true, true) => "Name and email not configured.",
-                    (true, false) => "Name not configured.",
-                    (false, true) => "Email not configured.",
+                    (true, true) => "还没有设置姓名和邮箱。",
+                    (true, false) => "还没有设置姓名。",
+                    (false, true) => "还没有设置邮箱。",
                     _ => unreachable!(),
                 };
                 precondition!(
-                    "{field} Set them with `jj config set --user user.name \"Some One\"` \
-                     and `jj config set --user user.email \"someone@example.com\"`."
+                    "{field}用 `jj config set --user user.name \"Some One\"` \
+                     和 `jj config set --user user.email \"someone@example.com\"` 来设置。"
                 );
             }
         }
@@ -390,7 +390,7 @@ impl Mutation for DescribeRevision {
         commit_builder.write().await?;
 
         match ws
-            .finish_transaction(tx, format!("describe commit {}", described.id().hex()))
+            .finish_transaction(tx, format!("修改改动的说明 {}", described.id().hex()))
             .await?
         {
             Some(new_status) => Ok(MutationResult::Updated {
@@ -443,7 +443,7 @@ impl Mutation for DuplicateRevisions {
         }
 
         match ws
-            .finish_transaction(tx, format!("duplicating {} commit(s)", num_clonees))
+            .finish_transaction(tx, format!("复制了 {} 个改动", num_clonees))
             .await?
         {
             Some(new_status) => {
@@ -481,9 +481,9 @@ impl Mutation for InsertRevisions {
         let (targets, is_immutable) = ws.resolve_change_set(&self.set, true)?;
         if is_immutable && !options.ignore_immutable {
             if targets.len() == 1 {
-                precondition!("Revision is immutable");
+                precondition!("这个改动已经定稿，不能修改");
             } else {
-                precondition!("Some revisions are immutable");
+                precondition!("有些改动已经定稿，不能修改");
             }
         }
 
@@ -499,7 +499,7 @@ impl Mutation for InsertRevisions {
             .context("resolve after_id")?;
 
         if ws.check_immutable([before.id().clone()])? && !options.ignore_immutable {
-            precondition!("Before revision is immutable");
+            precondition!("后面的改动已经定稿，不能修改");
         }
 
         // detach external children of any commit in the range
@@ -524,9 +524,9 @@ impl Mutation for InsertRevisions {
 
         // rebase the oldest onto after; the rest of the range follows
         let transaction_description = if targets.len() == 1 {
-            format!("insert commit {}", oldest.id().hex())
+            format!("在上一个改动之前插入 {}", oldest.id().hex())
         } else {
-            format!("insert {} commits", targets.len())
+            format!("在上一个改动之前插入 {} 个改动", targets.len())
         };
         let rebased_oldest =
             rewrite::rebase_commit(tx.repo_mut(), oldest.clone(), vec![after_id.clone()]).await?;
@@ -597,9 +597,9 @@ impl Mutation for MoveRevisions {
         let (targets, is_immutable) = ws.resolve_change_set(&self.set, true)?;
         if is_immutable && !options.ignore_immutable {
             if targets.len() == 1 {
-                precondition!("Revision is immutable");
+                precondition!("这个改动已经定稿，不能修改");
             } else {
-                precondition!("Some revisions are immutable");
+                precondition!("有些改动已经定稿，不能修改");
             }
         }
 
@@ -624,9 +624,9 @@ impl Mutation for MoveRevisions {
             })
             .collect();
         let transaction_description = if targets.len() == 1 {
-            format!("rebase commit {}", oldest.id().hex())
+            format!("移动改动 {}", oldest.id().hex())
         } else {
-            format!("rebase {} commits", targets.len())
+            format!("移动 {} 个改动", targets.len())
         };
         rewrite::rebase_commit(tx.repo_mut(), oldest.clone(), parent_ids).await?;
 
@@ -1001,7 +1001,7 @@ mod tests {
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("Name not configured"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("还没有设置姓名。"));
 
         Ok(())
     }
@@ -1031,7 +1031,7 @@ mod tests {
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("Email not configured"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("还没有设置邮箱。"));
 
         Ok(())
     }
@@ -1061,7 +1061,7 @@ mod tests {
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("Name and email not configured"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("还没有设置姓名和邮箱。"));
 
         Ok(())
     }

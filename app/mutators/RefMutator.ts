@@ -98,9 +98,14 @@ export default class RefMutator {
 
     onRename = async (options?: MutationOptions) => {
         let currentName = this.#ref.type === "Tag" ? this.#ref.tag_name : this.#ref.bookmark_name;
-        let response = await getInput("Rename Bookmark", "", [{ label: "Bookmark Name", choices: [currentName || ""] }]);
+        let isTag = this.#ref.type === "Tag";
+        let response = await getInput(
+            isTag ? "重命名标签" : "重命名分支",
+            "",
+            [{ label: isTag ? "标签名称" : "分支名称", choices: [currentName || ""] }],
+        );
         if (response) {
-            let new_name = response["Bookmark Name"];
+            let new_name = response[isTag ? "标签名称" : "分支名称"];
             mutate<RenameBookmark>("rename_bookmark", {
                 ref: this.#ref,
                 new_name
@@ -160,9 +165,9 @@ export default class RefMutator {
                     return;
                 }
 
-                let response = await getInput("Select Remote", "", [{ label: "Remote Name", choices: allRemotes.value }]);
+                let response = await getInput("选择远程", "", [{ label: "远程名称", choices: allRemotes.value }]);
                 if (response) {
-                    let remote_name = response["Remote Name"];
+                    let remote_name = response["远程名称"];
                     mutate<GitPush>("git_push", {
                         refspec: {
                             type: "RemoteBookmark",
@@ -221,9 +226,9 @@ export default class RefMutator {
                     return;
                 }
 
-                let response = await getInput("Select Remote", "", [{ label: "Remote Name", choices: trackedRemotes.value }]);
+                let response = await getInput("选择远程", "", [{ label: "远程名称", choices: trackedRemotes.value }]);
                 if (response) {
-                    let remote_name = response["Remote Name"];
+                    let remote_name = response["远程名称"];
                     mutate<GitFetch>("git_fetch", {
                         refspec: {
                             type: "RemoteBookmark",

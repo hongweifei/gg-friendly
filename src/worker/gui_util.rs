@@ -243,7 +243,7 @@ impl WorkspaceSession<'_> {
         self.finish_transaction(
             tx,
             format!(
-                "create initial working-copy commit in workspace '{}'",
+                "在工作区 '{}' 里创建初始工作副本",
                 workspace_name.as_symbol()
             ),
         )

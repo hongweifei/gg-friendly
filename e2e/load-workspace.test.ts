@@ -27,12 +27,12 @@ describe("`gg web` in a jj workspace", () => {
         // wait for content to load
         await ctx.page.waitForTimeout(2000);
 
-        // should NOT show the "No Workspace Loaded" error
-        let errorDialog = ctx.page.locator("text=No Workspace Loaded");
+        // should NOT show the "没有打开仓库" error
+        let errorDialog = ctx.page.locator("text=没有打开仓库");
         await expect(errorDialog.isVisible()).resolves.toBe(false);
 
-        // the page should have a log pane
-        let logPaneSelector = ctx.page.locator(".log-selector");
+        // the page should have a change list
+        let logPaneSelector = ctx.page.locator(".filters");
         await expect(logPaneSelector.isVisible()).resolves.toBe(true);
     });
 });

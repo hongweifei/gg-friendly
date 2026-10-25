@@ -33,13 +33,10 @@ impl Mutation for TrackBookmark {
     ) -> Result<MutationResult> {
         match self.r#ref {
             StoreRef::Tag { tag_name } => {
-                precondition!("{} is a tag and cannot be tracked", tag_name);
+                precondition!("{} 是标签，不能开始跟踪", tag_name);
             }
             StoreRef::LocalBookmark { bookmark_name, .. } => {
-                precondition!(
-                    "{} is a local bookmark and cannot be tracked",
-                    bookmark_name
-                );
+                precondition!("{} 是本地分支，不能开始跟踪", bookmark_name);
             }
             StoreRef::RemoteBookmark {
                 bookmark_name,
@@ -59,7 +56,7 @@ impl Mutation for TrackBookmark {
 
                 if remote_ref.is_tracked() {
                     precondition!(
-                        "{:?}@{:?} is already tracked",
+                        "{:?}@{:?} 已经在跟踪了",
                         bookmark_name_ref.as_str(),
                         remote_name_ref.as_str()
                     );
@@ -73,7 +70,7 @@ impl Mutation for TrackBookmark {
                     .finish_transaction(
                         tx,
                         format!(
-                            "track remote bookmark {:?}@{:?}",
+                            "开始跟踪远程分支 {:?}@{:?}",
                             bookmark_name_ref.as_str(),
                             remote_name_ref.as_str()
                         ),
@@ -103,7 +100,7 @@ impl Mutation for UntrackBookmark {
         let mut untracked = Vec::new();
         match self.r#ref {
             StoreRef::Tag { tag_name } => {
-                precondition!("{} is a tag and cannot be untracked", tag_name);
+                precondition!("{} 是标签，不能停止跟踪", tag_name);
             }
             StoreRef::LocalBookmark { bookmark_name, .. } => {
                 // untrack all remotes
@@ -139,7 +136,7 @@ impl Mutation for UntrackBookmark {
 
                 if !remote_ref.is_tracked() {
                     precondition!(
-                        "{:?}@{:?} is not tracked",
+                        "{:?}@{:?} 没有被跟踪",
                         bookmark_name_ref.as_str(),
                         remote_name_ref.as_str()
                     );
@@ -157,7 +154,7 @@ impl Mutation for UntrackBookmark {
         match ws
             .finish_transaction(
                 tx,
-                format!("untrack remote {}", combine_bookmarks(&untracked)),
+                format!("停止跟踪远程 {}", combine_bookmarks(&untracked)),
             )
             .await?
         {
@@ -182,12 +179,12 @@ impl Mutation for RenameBookmark {
 
         let ref_target = ws.view().get_local_bookmark(&old_name_ref).clone();
         if ref_target.is_absent() {
-            precondition!("No such bookmark: {}", old_name_ref.as_str());
+            precondition!("找不到分支：{}", old_name_ref.as_str());
         }
 
         let new_name_ref = RefNameBuf::from(self.new_name);
         if ws.view().get_local_bookmark(&new_name_ref).is_present() {
-            precondition!("Bookmark already exists: {}", new_name_ref.as_str());
+            precondition!("分支 {} 已经存在", new_name_ref.as_str());
         }
 
         let mut tx = ws.start_transaction().await?;
@@ -201,7 +198,7 @@ impl Mutation for RenameBookmark {
             .finish_transaction(
                 tx,
                 format!(
-                    "rename {} to {}",
+                    "把 {} 重命名为 {}",
                     old_name_ref.as_str(),
                     new_name_ref.as_str()
                 ),
@@ -234,17 +231,13 @@ impl Mutation for CreateRef {
                 remote_name,
                 ..
             } => {
-                precondition!(
-                    "{}@{} is a remote bookmark and cannot be created",
-                    bookmark_name,
-                    remote_name
-                );
+                precondition!("{}@{} 是远程分支，不能新建", bookmark_name, remote_name);
             }
             StoreRef::LocalBookmark { bookmark_name, .. } => {
                 let bookmark_name_ref = RefNameBuf::from(bookmark_name);
                 let existing_bookmark = ws.view().get_local_bookmark(&bookmark_name_ref);
                 if existing_bookmark.is_present() {
-                    precondition!("{} already exists", bookmark_name_ref.as_str());
+                    precondition!("分支 {} 已经存在", bookmark_name_ref.as_str());
                 }
 
                 tx.repo_mut().set_local_bookmark_target(
@@ -256,7 +249,7 @@ impl Mutation for CreateRef {
                     .finish_transaction(
                         tx,
                         format!(
-                            "create {} pointing to commit {}",
+                            "创建 {}，指向改动 {}",
                             bookmark_name_ref.as_str(),
                             ws.format_commit_id(commit.id()).hex
                         ),
@@ -274,7 +267,7 @@ impl Mutation for CreateRef {
                 let tag_name_ref = RefNameBuf::from(tag_name);
                 let existing_tag = ws.view().get_local_tag(&tag_name_ref);
                 if existing_tag.is_present() {
-                    precondition!("{} already exists", tag_name_ref.as_str());
+                    precondition!("标签 {} 已经存在", tag_name_ref.as_str());
                 }
 
                 tx.repo_mut()
@@ -284,7 +277,7 @@ impl Mutation for CreateRef {
                     .finish_transaction(
                         tx,
                         format!(
-                            "create {} pointing to commit {}",
+                            "创建 {}，指向改动 {}",
                             tag_name_ref.as_str(),
                             ws.format_commit_id(commit.id()).hex
                         ),
@@ -336,7 +329,7 @@ impl Mutation for DeleteRef {
                     .finish_transaction(
                         tx,
                         format!(
-                            "forget {}@{}",
+                            "从列表中移除 {}@{}",
                             bookmark_name_ref.as_str(),
                             remote_name_ref.as_str()
                         ),
@@ -358,7 +351,7 @@ impl Mutation for DeleteRef {
                     .set_local_bookmark_target(&bookmark_name_ref, RefTarget::absent());
 
                 match ws
-                    .finish_transaction(tx, format!("forget {}", bookmark_name_ref.as_str()))
+                    .finish_transaction(tx, format!("从列表中移除 {}", bookmark_name_ref.as_str()))
                     .await?
                 {
                     Some(new_status) => Ok(MutationResult::Updated {
@@ -376,7 +369,7 @@ impl Mutation for DeleteRef {
                     .set_local_tag_target(&tag_name_ref, RefTarget::absent());
 
                 match ws
-                    .finish_transaction(tx, format!("forget tag {}", tag_name_ref.as_str()))
+                    .finish_transaction(tx, format!("从列表中移除标签 {}", tag_name_ref.as_str()))
                     .await?
                 {
                     Some(new_status) => Ok(MutationResult::Updated {
@@ -408,13 +401,13 @@ impl Mutation for MoveRef {
                 remote_name,
                 ..
             } => {
-                precondition!("Bookmark is remote: {bookmark_name}@{remote_name}")
+                precondition!("这是远程分支：{bookmark_name}@{remote_name}")
             }
             StoreRef::LocalBookmark { bookmark_name, .. } => {
                 let bookmark_name_ref = RefNameBuf::from(bookmark_name);
                 let old_target = ws.view().get_local_bookmark(&bookmark_name_ref);
                 if old_target.is_absent() {
-                    precondition!("No such bookmark: {:?}", bookmark_name_ref.as_str());
+                    precondition!("找不到分支：{:?}", bookmark_name_ref.as_str());
                 }
 
                 tx.repo_mut().set_local_bookmark_target(
@@ -425,11 +418,7 @@ impl Mutation for MoveRef {
                 match ws
                     .finish_transaction(
                         tx,
-                        format!(
-                            "point {:?} to commit {}",
-                            bookmark_name_ref,
-                            commit.id().hex()
-                        ),
+                        format!("把 {:?} 指向改动 {}", bookmark_name_ref, commit.id().hex()),
                     )
                     .await?
                 {
@@ -444,7 +433,7 @@ impl Mutation for MoveRef {
                 let tag_name_ref = RefNameBuf::from(tag_name);
                 let old_target = ws.view().get_local_tag(&tag_name_ref);
                 if old_target.is_absent() {
-                    precondition!("No such tag: {:?}", tag_name_ref.as_str());
+                    precondition!("找不到标签：{:?}", tag_name_ref.as_str());
                 }
 
                 tx.repo_mut()
@@ -454,7 +443,7 @@ impl Mutation for MoveRef {
                     .finish_transaction(
                         tx,
                         format!(
-                            "point {:?} to commit {}",
+                            "把 {:?} 指向改动 {}",
                             tag_name_ref.as_str(),
                             commit.id().hex()
                         ),
@@ -474,8 +463,8 @@ impl Mutation for MoveRef {
 
 fn combine_bookmarks(bookmark_names: &[impl Display]) -> String {
     match bookmark_names {
-        [bookmark_name] => format!("bookmark {}", bookmark_name),
-        bookmark_names => format!("bookmarks {}", bookmark_names.iter().join(", ")),
+        [bookmark_name] => format!("分支 {}", bookmark_name),
+        bookmark_names => format!("分支 {}", bookmark_names.iter().join(", ")),
     }
 }
 
@@ -1007,14 +996,11 @@ mod tests {
 
     #[test]
     fn combine_single_bookmark() {
-        assert_eq!(super::combine_bookmarks(&["main"]), "bookmark main");
+        assert_eq!(super::combine_bookmarks(&["main"]), "分支 main");
     }
 
     #[test]
     fn combine_multiple_bookmarks() {
-        assert_eq!(
-            super::combine_bookmarks(&["main", "dev"]),
-            "bookmarks main, dev"
-        );
+        assert_eq!(super::combine_bookmarks(&["main", "dev"]), "分支 main, dev");
     }
 }

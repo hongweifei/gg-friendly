@@ -24,7 +24,7 @@ Core component for direct-manipulation objects. A drag&drop source.
     export let suffix: string | null = null;
     export let label: string;
     export let selected: boolean = false;
-    export let conflicted: boolean;
+    export let conflicted: boolean = false;
     export let operand: Operand | null;
     export let defaultCommand: string | null = null;
 
@@ -187,6 +187,7 @@ Core component for direct-manipulation objects. A drag&drop source.
         background: var(--ctp-base);
     }
 
+    /* a conflicted object is striped, so it is obvious in any list */
     .conflict {
         background: repeating-linear-gradient(
             120deg,
@@ -194,16 +195,6 @@ Core component for direct-manipulation objects. A drag&drop source.
             transparent 12px,
             var(--ctp-surface0) 12px,
             var(--ctp-surface0) 15px
-        );
-    }
-
-    .selected.conflict {
-        background: repeating-linear-gradient(
-            120deg,
-            var(--ctp-surface0) 0px,
-            var(--ctp-surface0) 12px,
-            var(--ctp-base) 12px,
-            var(--ctp-base) 15px
         );
     }
 

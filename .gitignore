@@ -33,6 +33,11 @@ mise.local.toml
 
 # Playwright
 /e2e/results
+.vitest-attachments/
+
+# Working directories for local design work
+/work/
+/explore/
 
 # Coding agents
 .claude/settings.local.json

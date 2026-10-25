@@ -1,4 +1,4 @@
-use super::{mkid, mkrepo, revs};
+use super::{XDG_ENV_LOCK, mkid, mkrepo, revs};
 use crate::{
     messages::{
         RepoConfig, RepoStatus, RevSet,
@@ -402,7 +402,9 @@ async fn query_revs_not_found() -> Result<()> {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn config_read() -> Result<()> {
+    let _lock = XDG_ENV_LOCK.lock().unwrap();
     let repo = mkrepo();
 
     let (tx, rx) = channel::<SessionEvent>();
@@ -430,7 +432,9 @@ async fn config_read() -> Result<()> {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn config_write() -> Result<()> {
+    let _lock = XDG_ENV_LOCK.lock().unwrap();
     let repo = mkrepo();
 
     let (tx, rx) = channel::<SessionEvent>();
@@ -463,7 +467,9 @@ async fn config_write() -> Result<()> {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn config_write_table() -> Result<()> {
+    let _lock = XDG_ENV_LOCK.lock().unwrap();
     let repo = mkrepo();
 
     let (tx, rx) = channel::<SessionEvent>();

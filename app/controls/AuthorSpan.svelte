@@ -9,7 +9,7 @@
 
 <style>
     .author {
-        color: var(--ctp-subtext0);
+        color: var(--ctp-subtext1);
         white-space: nowrap;
         pointer-events: auto;
     }

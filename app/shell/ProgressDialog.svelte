@@ -4,7 +4,7 @@
 
     export let progress: ProgressEvent | undefined;
 
-    let label = "Working...";
+    let label = "正在处理...";
     let value: number | undefined = undefined;
 
     $: if (progress) {

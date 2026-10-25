@@ -18,10 +18,12 @@ use jj_lib::{
     },
     diff_presentation::LineCompareMode,
     files::FileMergeHunkLevel,
+    git::REMOTE_NAME_FOR_LOCAL_GIT_REPO,
     graph::{GraphEdgeType, GraphNode, TopoGroupedGraph},
     matchers::EverythingMatcher,
     merge::{Diff, SameChange},
     merged_tree::{TreeDiffEntry, TreeDiffStream},
+    op_store::RefTarget,
     ref_name::{RefNameBuf, RemoteNameBuf, RemoteRefSymbol},
     repo::Repo,
     repo_path::RepoPath,
@@ -477,6 +479,70 @@ pub fn query_remotes(
     };
 
     Ok(matching_remotes)
+}
+
+/// List every branch in the repository, local and remote.
+///
+/// The local branch and the remote branches it tracks are the same branch, so
+/// they are reported separately and the frontend can group them.
+pub fn query_branches(ws: &WorkspaceSession) -> Result<Vec<BranchInfo>> {
+    let mut result = Vec::new();
+
+    for (bookmark_name, bookmark_target) in ws.view().bookmarks() {
+        let local_target = bookmark_target.local_target;
+        let remote_refs = bookmark_target.remote_refs;
+
+        if local_target.is_present() {
+            // the local branch is synced when it matches every remote it tracks
+            let is_synced = remote_refs.iter().all(|&(remote_name, remote_ref)| {
+                remote_name == REMOTE_NAME_FOR_LOCAL_GIT_REPO
+                    || !remote_ref.is_tracked()
+                    || remote_ref.target == *local_target
+            });
+
+            result.push(BranchInfo {
+                name: bookmark_name.as_str().to_owned(),
+                is_local: true,
+                remote_name: None,
+                target: single_target(ws, local_target),
+                is_tracking: remote_refs.iter().any(|&(remote_name, remote_ref)| {
+                    remote_name != REMOTE_NAME_FOR_LOCAL_GIT_REPO && remote_ref.is_tracked()
+                }),
+                is_synced,
+                is_absent: false,
+                has_conflict: !local_target.is_resolved(),
+            });
+        }
+
+        for &(remote_name, remote_ref) in &remote_refs {
+            if remote_name == REMOTE_NAME_FOR_LOCAL_GIT_REPO {
+                continue;
+            }
+            result.push(BranchInfo {
+                name: bookmark_name.as_str().to_owned(),
+                is_local: false,
+                remote_name: Some(remote_name.as_str().to_owned()),
+                target: single_target(ws, &remote_ref.target),
+                is_tracking: remote_ref.is_tracked(),
+                is_synced: remote_ref.target == *local_target,
+                is_absent: remote_ref.is_absent(),
+                has_conflict: !remote_ref.target.is_resolved(),
+            });
+        }
+    }
+
+    Ok(result)
+}
+
+/// The commit a ref points at, if it points at exactly one.
+fn single_target(ws: &WorkspaceSession, target: &RefTarget) -> Option<crate::messages::CommitId> {
+    let mut adds = target.present_adds();
+    let commit_id = adds.next()?;
+    if adds.next().is_some() {
+        // the ref points at more than one commit, so there's no single target
+        return None;
+    }
+    Some(ws.format_commit_id(commit_id))
 }
 
 async fn format_tree_changes(

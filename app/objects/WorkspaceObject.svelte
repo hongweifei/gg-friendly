@@ -10,7 +10,7 @@
 </script>
 
 <Object {operand} label={name} defaultCommand="open" conflicted={false} let:context>
-    <Chip {context} target={false} immobile tip="workspace: {name}">
+    <Chip {context} target={false} immobile tip="工作区：{name}">
         <Icon name="at-sign" state="change" />
         <span>{name}</span>
     </Chip>

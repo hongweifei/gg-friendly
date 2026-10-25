@@ -11,7 +11,7 @@
     let operand: Operand = { type: "Ref", header, ref };
 </script>
 
-<Chip context={false} target={false} immobile tip="tag">
+<Chip context={false} target={false} immobile tip="标签">
     <Icon name="tag" state="change" />
     <span>{ref.tag_name}</span>
 </Chip>

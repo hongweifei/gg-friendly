@@ -306,9 +306,11 @@ async fn transaction_snapshot_path_is_visible() -> Result<()> {
     Ok(())
 }
 
-// serialize tests that mutate XDG_CONFIG_HOME. holding it across awaits is fine:
-// each #[tokio::test] has its own runtime thread, so it only blocks the other test
-static XDG_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+// Tests that change XDG_CONFIG_HOME change it for the whole process, so every
+// test that reads or writes jj's config has to take this lock too. Otherwise
+// a config file written under one config root is looked for under another,
+// and the test fails at random.
+pub(crate) static XDG_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]

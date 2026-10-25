@@ -32,63 +32,63 @@ export default class BinaryMutator {
         // can't change finalised commits without a gesture
         if (this.#from.type == "Revision" && this.#from.header.is_immutable) {
             if (this.#ignoreImmutable) {
-                return { type: "yes", hint: ["Rebasing immutable revision ", this.#from.header.id.change] };
+                return { type: "yes", hint: ["重新基于（这个改动已定稿）", this.#from.header.id.change] };
             } else {
-                return { type: "maybe", hint: "(immutable - toggle 🛡 to override)" };
+                return { type: "maybe", hint: "（已定稿 —— 打开底部的盾牌开关可以解除保护）" };
             }
         }
         if ((this.#from.type == "Revisions" || this.#from.type == "Change") && this.#from.headers.some((h) => h.is_immutable)) {
             if (this.#ignoreImmutable) {
                 return this.#from.type == "Change"
-                    ? { type: "yes", hint: [`Squashing from immutable revision `, this.#from.headers[0].id.change] }
+                    ? { type: "yes", hint: [`合并（这个改动已定稿）`, this.#from.headers[0].id.change] }
                     : {
                         type: "yes", hint: this.#from.headers.length == 1
-                            ? ["Rebasing immutable revision ", this.#from.headers[0].id.change]
-                            : ["Rebasing immutable revisions ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
+                            ? ["重新基于（这个改动已定稿）", this.#from.headers[0].id.change]
+                            : ["重新基于（这些改动已定稿）", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
                     };
             }
             else {
-                return { type: "maybe", hint: "(immutable - toggle 🛡 to override)" };
+                return { type: "maybe", hint: "（已定稿 —— 打开底部的盾牌开关可以解除保护）" };
             }
         }
 
         // removing a parent changes the child
         if (this.#from.type == "Parent" && this.#from.child.is_immutable) {
             if (this.#ignoreImmutable) {
-                return { type: "yes", hint: ["Removing parent from immutable revision ", this.#from.child.id.change] };
+                return { type: "yes", hint: ["移除上一个改动（这个改动已定稿）", this.#from.child.id.change] };
             } else {
-                return { type: "maybe", hint: "(immutable - toggle 🛡 to override)" };
+                return { type: "maybe", hint: "（已定稿 —— 打开底部的盾牌开关可以解除保护）" };
             }
         } else if (this.#from.type == "Parent" && this.#from.child.parent_ids.length == 1) {
-            return { type: "maybe", hint: "(child has only one parent)" };
+            return { type: "maybe", hint: "（这个改动只有一个上一个改动）" };
         }
 
         // can change these listed things
         if (this.#from.type == "Revision") {
-            return { type: "yes", hint: ["Rebasing revision ", this.#from.header.id.change] };
+            return { type: "yes", hint: ["重新基于改动 ", this.#from.header.id.change] };
         } else if (this.#from.type == "Revisions") {
             return {
-                type: "yes", hint: this.#from.headers.length == 1 ? ["Rebasing revision ", this.#from.headers[0].id.change] :
-                    ["Rebasing revisions ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
+                type: "yes", hint: this.#from.headers.length == 1 ? ["重新基于改动 ", this.#from.headers[0].id.change] :
+                    ["重新基于这些改动 ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
             };
         } else if (this.#from.type == "Parent") {
-            return { type: "yes", hint: ["Removing parent from revision ", this.#from.child.id.change] };
+            return { type: "yes", hint: ["移除上一个改动 ", this.#from.child.id.change] };
         } else if (this.#from.type == "Change") {
             if (this.#from.hunk) {
                 return {
                     type: "yes", hint: this.#from.headers.length == 1 ?
-                        [`Squashing hunk ${this.#from.hunk.location.from_file.start}:${this.#from.hunk.location.from_file.start + this.#from.hunk.location.from_file.len}@${this.#from.path.relative_path} from revision `, this.#from.headers[0].id.change] :
-                        [`Squashing hunk ${this.#from.hunk.location.from_file.start}:${this.#from.hunk.location.from_file.start + this.#from.hunk.location.from_file.len}@${this.#from.path.relative_path} from revisions `, this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
+                        [`合并局部内容 ${this.#from.hunk.location.from_file.start}:${this.#from.hunk.location.from_file.start + this.#from.hunk.location.from_file.len}@${this.#from.path.relative_path}，来源改动 `, this.#from.headers[0].id.change] :
+                        [`合并局部内容 ${this.#from.hunk.location.from_file.start}:${this.#from.hunk.location.from_file.start + this.#from.hunk.location.from_file.len}@${this.#from.path.relative_path}，来源改动 `, this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
                 };
             } else {
                 return {
                     type: "yes", hint: this.#from.headers.length == 1 ?
-                        [`Squashing file ${this.#from.path.relative_path} from revision `, this.#from.headers[0].id.change] :
-                        [`Squashing file ${this.#from.path.relative_path} from revisions `, this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
+                        [`合并文件内容 ${this.#from.path.relative_path}，来源改动 `, this.#from.headers[0].id.change] :
+                        [`合并文件内容 ${this.#from.path.relative_path}，来源改动 `, this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change]
                 };
             }
         } else if (this.#from.type == "Ref" && this.#from.ref.type != "Tag") {
-            return { type: "yes", hint: ["Moving bookmark ", this.#from.ref] };
+            return { type: "yes", hint: ["移动分支 ", this.#from.ref] };
         }
 
         return { type: "no" };
@@ -106,23 +106,23 @@ export default class BinaryMutator {
 
         if (this.#from.type == "Revision") {
             if (this.#to.type == "Revision") {
-                return { type: "yes", hint: ["Rebasing revision ", this.#from.header.id.change, " onto ", this.#to.header.id.change] };
+                return { type: "yes", hint: ["把改动 ", this.#from.header.id.change, " 重新基于 ", this.#to.header.id.change] };
             } else if (this.#to.type == "Parent") {
                 if (this.#to.child == this.#from.header) {
                     return { type: "no" };
                 } else if (this.#to.child.is_immutable && !this.#ignoreImmutable) {
-                    return { type: "maybe", hint: "(immutable - toggle 🛡 to override)" };
+                    return { type: "maybe", hint: "（已定稿 —— 打开底部的盾牌开关可以解除保护）" };
                 } else {
-                    return { type: "yes", hint: ["Inserting revision ", this.#from.header.id.change, " before ", this.#to.child.id.change] };
+                    return { type: "yes", hint: ["把改动 ", this.#from.header.id.change, " 插入到 ", this.#to.child.id.change] };
                 }
             } else if (this.#to.type == "Merge") {
                 if (sameChange(this.#to.header.id.change, this.#from.header.id.change)) {
                     return { type: "no" };
                 } else {
-                    return { type: "yes", hint: ["Adding parent to revision ", this.#to.header.id.change] };
+                    return { type: "yes", hint: ["给改动添加上一个改动 ", this.#to.header.id.change] };
                 }
             } else if (this.#to.type == "Repository") {
-                return { type: "yes", hint: ["Abandoning commit ", this.#from.header.id.commit] };
+                return { type: "yes", hint: ["放弃改动 ", this.#from.header.id.commit] };
             }
         }
 
@@ -134,8 +134,8 @@ export default class BinaryMutator {
                 } else {
                     return {
                         type: "yes", hint: this.#from.headers.length == 1
-                            ? ["Rebasing revision ", this.#from.headers[0].id.change, " onto ", this.#to.header.id.change]
-                            : ["Rebasing revisions ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " onto ", this.#to.header.id.change]
+                            ? ["把改动 ", this.#from.headers[0].id.change, " 重新基于 ", this.#to.header.id.change]
+                            : ["把这些改动 ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " 重新基于 ", this.#to.header.id.change]
                     };
                 }
             } else if (this.#to.type == "Parent") {
@@ -147,15 +147,15 @@ export default class BinaryMutator {
                 } else {
                     return {
                         type: "yes", hint: this.#from.headers.length == 1
-                            ? ["Inserting revision ", this.#from.headers[0].id.change, " before ", beforeHeader.id.change]
-                            : ["Inserting revisions ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " before ", beforeHeader.id.change]
+                            ? ["把改动 ", this.#from.headers[0].id.change, " 插入到 ", beforeHeader.id.change]
+                            : ["把这些改动 ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " 插入到 ", beforeHeader.id.change]
                     };
                 }
             } else if (this.#to.type == "Repository") {
                 return {
                     type: "yes", hint: this.#from.headers.length == 1
-                        ? ["Abandoning commit ", this.#from.headers[0].id.commit]
-                        : ["Abandoning commits ", this.#from.headers[this.#from.headers.length - 1].id.commit, "::", this.#from.headers[0].id.commit]
+                        ? ["放弃改动 ", this.#from.headers[0].id.commit]
+                        : ["放弃这些改动 ", this.#from.headers[this.#from.headers.length - 1].id.commit, "::", this.#from.headers[0].id.commit]
                 };
             } else if (this.#to.type == "Merge") {
                 let toHeader = this.#to.header;
@@ -164,8 +164,8 @@ export default class BinaryMutator {
                 } else {
                     return {
                         type: "yes", hint: this.#from.headers.length == 1
-                            ? ["Adding parent ", this.#from.headers[0].id.change, " to revision ", toHeader.id.change]
-                            : ["Adding parents ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " to revision ", toHeader.id.change]
+                            ? ["添加上一个改动 ", this.#from.headers[0].id.change, " 到改动 ", toHeader.id.change]
+                            : ["添加这些上一个改动 ", this.#from.headers[this.#from.headers.length - 1].id.change, "::", this.#from.headers[0].id.change, " 到改动 ", toHeader.id.change]
                     };
                 }
             }
@@ -173,7 +173,7 @@ export default class BinaryMutator {
 
         if (this.#from.type == "Parent") {
             if (this.#to.type == "Repository") {
-                return { type: "yes", hint: ["Removing parent from revision ", this.#from.child.id.change] };
+                return { type: "yes", hint: ["移除上一个改动 ", this.#from.child.id.change] };
             }
         }
 
@@ -183,16 +183,16 @@ export default class BinaryMutator {
                 if (this.#from.headers.some((header) => sameChange(header.id.change, toHeader.id.change))) {
                     return { type: "no" };
                 } else if (toHeader.is_immutable && !this.#ignoreImmutable) {
-                    return { type: "maybe", hint: "(immutable - toggle 🛡 to override)" };
+                    return { type: "maybe", hint: "（已定稿 —— 打开底部的盾牌开关可以解除保护）" };
                 } else {
-                    return { type: "yes", hint: [`Squashing changes from ${this.#from.path.relative_path} into `, toHeader.id.change] };
+                    return { type: "yes", hint: [`从改动合并内容 ${this.#from.path.relative_path}，目标改动 `, toHeader.id.change] };
                 }
             } else if (this.#to.type == "Repository") {
                 let fromOldest = this.#from.headers[this.#from.headers.length - 1];
                 if (fromOldest.parent_ids.length == 1) {
-                    return { type: "yes", hint: [`Restoring changes at ${this.#from.path.relative_path} from parent `, fromOldest.parent_ids[0]] };
+                    return { type: "yes", hint: [`恢复改动 ${this.#from.path.relative_path}，来源上一个改动 `, fromOldest.parent_ids[0]] };
                 } else {
-                    return { type: "maybe", hint: "(revision has multiple parents)" };
+                    return { type: "maybe", hint: "（这个改动有多个上一个改动）" };
                 }
             }
         }
@@ -203,7 +203,7 @@ export default class BinaryMutator {
                 if (sameChange(this.#to.header.id.change, this.#from.header.id.change)) {
                     return { type: "no" };
                 } else {
-                    return { type: "yes", hint: ["Moving bookmark ", this.#from.ref, " to ", this.#to.header.id.change] };
+                    return { type: "yes", hint: ["移动分支 ", this.#from.ref, " 到 ", this.#to.header.id.change] };
                 }
             }
 
@@ -211,19 +211,19 @@ export default class BinaryMutator {
             else if (this.#to.type == "Ref" && this.#to.ref.type == "LocalBookmark" &&
                 this.#from.ref.type == "RemoteBookmark" && this.#from.ref.bookmark_name == this.#to.ref.bookmark_name) {
                 if (this.#from.ref.is_tracked) {
-                    return { type: "maybe", hint: "(already tracked)" };
+                    return { type: "maybe", hint: "（已经在跟踪了）" };
                 } else {
-                    return { type: "yes", hint: ["Tracking remote bookmark ", this.#from.ref] };
+                    return { type: "yes", hint: ["开始跟踪远程分支 ", this.#from.ref] };
                 }
             }
 
             // anything -> anywhere: delete
             else if (this.#to.type == "Repository") {
                 if (this.#from.ref.type == "LocalBookmark") {
-                    return { type: "yes", hint: ["Deleting bookmark ", this.#from.ref] };
+                    return { type: "yes", hint: ["删除分支 ", this.#from.ref] };
                 } else {
                     return {
-                        type: "yes", hint: ["Forgetting remote bookmark ", this.#from.ref]
+                        type: "yes", hint: ["从列表中移除远程分支 ", this.#from.ref]
                     };
                 }
             }

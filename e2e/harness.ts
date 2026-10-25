@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { fileURLToPath } from "url";
+import { installedChromium } from "./browser";
 
 export const PROJECT_ROOT = join(fileURLToPath(import.meta.url), "../..");
 export const TEST_REPO_ZIP = join(PROJECT_ROOT, "res", "test-repo.zip");
@@ -16,7 +17,7 @@ export interface TestContext {
 }
 
 export async function createContext(): Promise<TestContext> {
-    let browser = await chromium.launch({ headless: true });
+    let browser = await chromium.launch({ headless: true, executablePath: installedChromium() });
     let page = await browser.newPage();
     let tempDir = await mkdtemp(join(tmpdir(), "gg-test-"));
     return { browser, page, tempDir, ggProcess: null };

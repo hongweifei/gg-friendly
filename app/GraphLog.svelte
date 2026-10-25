@@ -8,6 +8,11 @@
     export interface EnhancedRow extends LogRow {
         passingLines: Array<EnhancedLine>;
     }
+
+    // the height of one row of the graph, shared with the line drawing and
+    // the list's keyboard navigation so they stay aligned
+    export const ROW_HEIGHT = 30;
+    export const COLUMN_WIDTH = 22;
 </script>
 
 <script lang="ts">
@@ -20,8 +25,8 @@
         default: { row: EnhancedRow | null };
     }
 
-    const columnWidth = 18;
-    const rowHeight = 30;
+    const columnWidth = COLUMN_WIDTH;
+    const rowHeight = ROW_HEIGHT;
     export let containerHeight: number;
     export let containerWidth: number;
     export let scrollTop: number;

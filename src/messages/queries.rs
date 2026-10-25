@@ -103,3 +103,27 @@ pub struct LogPage {
     pub rows: Vec<LogRow>,
     pub has_more: bool,
 }
+
+/// A branch in the repository, either local or on a remote.
+#[derive(Serialize, Debug)]
+#[cfg_attr(feature = "ts-rs", derive(TS), ts(export, export_to = "app/messages/"))]
+pub struct BranchInfo {
+    /// The branch name. For a remote branch this is the name without the
+    /// remote, so `main` and `main@origin` can be told apart by `is_local`.
+    pub name: String,
+    /// Whether this is a local branch.
+    pub is_local: bool,
+    /// The remote this branch lives on, if it is a remote branch.
+    pub remote_name: Option<String>,
+    /// The commit the branch points at.
+    pub target: Option<CommitId>,
+    /// For a local branch: whether it tracks a remote branch. For a remote
+    /// branch: whether the local branch of the same name tracks it.
+    pub is_tracking: bool,
+    /// Whether the branch matches the remote it tracks.
+    pub is_synced: bool,
+    /// Whether the branch was deleted on the remote.
+    pub is_absent: bool,
+    /// Whether the branch points at more than one commit.
+    pub has_conflict: bool,
+}

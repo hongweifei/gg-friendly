@@ -17,19 +17,18 @@ describe("`gg web` in an empty directory", () => {
         await destroyContext(ctx);
     });
 
-    it("displays 'No Workspace Loaded'", async () => {
+    it("displays '没有打开仓库'", async () => {
         let serverUrl = startGG(ctx);
 
         await ctx.page.goto(await serverUrl);
 
         // wait for the error dialog to appear
         await expect(async () => {
-            let element = ctx.page.locator("text=No Workspace Loaded");
+            let element = ctx.page.locator("text=没有打开仓库");
             await element.waitFor({ timeout: 15000 });
         }).not.toThrow();
 
         // verify it's got some of the expected content
-        await expect(ctx.page.locator("text=You can run").isVisible()).resolves.toBe(true);
-        await expect(ctx.page.locator("text=in a Jujutsu workspace").isVisible()).resolves.toBe(true);
+        await expect(ctx.page.locator("text=请在 Jujutsu 仓库目录里运行").isVisible()).resolves.toBe(true);
     });
 });

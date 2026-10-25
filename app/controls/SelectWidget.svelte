@@ -51,7 +51,7 @@
     .wrapper > :global(:last-child) {
         position: absolute;
         right: 3px;
-        height: 32px;
+        height: var(--height-compact);
     }
 
     select {
@@ -70,7 +70,7 @@
         }
 
         select {
-            height: 30px;
+            height: var(--height-compact);
             min-width: 150px;
             padding-right: 3px;
 

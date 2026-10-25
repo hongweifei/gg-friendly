@@ -29,6 +29,39 @@ export const logQueryRequest = writable<string | null>(null);
 export const lastFocus = writable<number>(Date.now());
 export const ignoreToggled = writable<boolean>(false);
 
+/**
+ * Counts how many times the repository has been changed by an operation.
+ *
+ * The status event says what the repository looks like now, but it only
+ * arrives when the operation moved the working copy. Copying a change or
+ * renaming a branch leaves the working copy alone, so the status looks the
+ * same afterwards even though the repository is different. This counter is
+ * the signal that something happened at all.
+ */
+export const repoChanges = writable<number>(0);
+
+/**
+ * The text the user is searching the change list for. The top bar and the
+ * list's own search box share this, so there is only ever one search.
+ */
+export const searchText = writable<string>("");
+export const searchOpen = writable<boolean>(false);
+
+/**
+ * Which theme to use. "system" follows the operating system's setting, and is
+ * the default. The repository's own setting still applies when the user has
+ * not picked one here.
+ */
+export type ThemeChoice = "system" | "light" | "dark";
+export const themeChoice = writable<ThemeChoice>("system");
+
+/**
+ * The branch the user picked in the branch list. The change list is narrowed
+ * to it, and it is kept apart from the query dropdown so picking a branch
+ * does not change what the dropdown shows.
+ */
+export const branchFilter = writable<string | null>(null);
+
 export const selectionHeaders = writable<RevHeader[]>([]);
 
 export const descriptionDraft = writable<{ changeKey: string; text: string; } | null>(null);

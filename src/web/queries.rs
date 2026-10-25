@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::messages::{
     RepoConfig, RepoStatus, RevSet,
-    queries::{LogPage, RevsResult},
+    queries::{BranchInfo, LogPage, RevsResult},
 };
 use crate::worker::SessionEvent;
 
@@ -22,6 +22,7 @@ pub fn router() -> Router<AppState> {
         .route("/query_log_next_page", post(query_log_next_page))
         .route("/query_revisions", post(query_revisions))
         .route("/query_remotes", post(query_remotes))
+        .route("/query_branches", post(query_branches))
         .route("/query_recent_workspaces", post(query_recent_workspaces))
         .route("/query_snapshot", post(query_snapshot))
 }
@@ -117,6 +118,13 @@ async fn query_remotes(
         tx,
         tracking_bookmark: req.tracking_bookmark,
     })?;
+    let result = rx.recv()??;
+    Ok(Json(result))
+}
+
+async fn query_branches(State(state): State<AppState>) -> Result<Json<Vec<BranchInfo>>, ApiError> {
+    let (tx, rx) = channel();
+    state.worker_tx.send(SessionEvent::QueryBranches { tx })?;
     let result = rx.recv()??;
     Ok(Json(result))
 }

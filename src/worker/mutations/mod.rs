@@ -150,7 +150,7 @@ impl Mutation for ExternalResolve {
         let commit = ws.resolve_change_id(&self.id)?;
 
         if ws.check_immutable(vec![commit.id().clone()])? {
-            precondition!("Revision is immutable");
+            precondition!("这个改动已经定稿，不能修改");
         }
 
         let tree = commit.tree();
@@ -185,7 +185,7 @@ impl Mutation for ExternalResolve {
             .await?;
 
         match ws
-            .finish_transaction(tx, format!("resolve conflicts in {}", commit.id().hex()))
+            .finish_transaction(tx, format!("解决 {} 里的冲突", commit.id().hex()))
             .await?
         {
             Some(new_status) => Ok(MutationResult::Updated {
@@ -208,7 +208,7 @@ impl Mutation for GitFetch {
 
         let git_repo = match ws.git_repo() {
             Some(git_repo) => git_repo,
-            None => precondition!("No git backend"),
+            None => precondition!("这个仓库没有 git 后端"),
         };
 
         let mut remote_patterns = Vec::new();
@@ -289,10 +289,7 @@ impl Mutation for GitFetch {
             }
         }
 
-        match ws
-            .finish_transaction(tx, "fetch from git remote(s)".to_string())
-            .await?
-        {
+        match ws.finish_transaction(tx, "从远程下载".to_string()).await? {
             Some(new_status) => Ok(MutationResult::Updated {
                 new_status,
                 new_selection: None,
@@ -446,23 +443,23 @@ impl Mutation for GitPush {
         for commit in commits {
             let mut reasons = vec![];
             if commit.description().is_empty() {
-                reasons.push("it has no description");
+                reasons.push("没有说明");
             }
             if commit.author().name.is_empty()
                 || commit.author().email.is_empty()
                 || commit.committer().name.is_empty()
                 || commit.committer().email.is_empty()
             {
-                reasons.push("it has no author and/or committer set");
+                reasons.push("没有设置作者和/或提交者");
             }
             if commit.has_conflict() {
-                reasons.push("it has conflicts");
+                reasons.push("有冲突");
             }
             if !reasons.is_empty() {
                 precondition!(
-                    "Won't push revision {} since {}",
+                    "不能上传改动 {}，因为{}",
                     ws.format_change_id(commit.id(), commit.change_id()).prefix,
-                    reasons.join(" and ")
+                    reasons.join("和")
                 );
             }
         }
@@ -475,12 +472,12 @@ impl Mutation for GitPush {
             match &self.refspec {
                 GitRefspec::AllBookmarks { remote_name } => {
                     precondition!(
-                        "No tracked bookmarks to push to remote '{remote_name}'. Track or push a bookmark first."
+                        "没有已跟踪的分支可以上传到远程 '{remote_name}'。请先跟踪一个分支或者上传一次。"
                     );
                 }
                 GitRefspec::AllRemotes { bookmark_ref } => {
                     let bookmark_name = bookmark_ref.as_bookmark()?;
-                    precondition!("Bookmark '{bookmark_name}' is not tracked at any remote.");
+                    precondition!("分支 '{bookmark_name}' 没有被任何远程跟踪");
                 }
                 GitRefspec::RemoteBookmark {
                     remote_name,
@@ -488,7 +485,7 @@ impl Mutation for GitPush {
                 } => {
                     let bookmark_name = bookmark_ref.as_bookmark()?;
                     precondition!(
-                        "Bookmark '{bookmark_name}' is not tracked at remote '{remote_name}'. Track it first."
+                        "分支 '{bookmark_name}' 没有被远程 '{remote_name}' 跟踪。请先开始跟踪它。"
                     );
                 }
             }
@@ -568,20 +565,17 @@ impl Mutation for GitPush {
                 tx,
                 match &self.refspec {
                     GitRefspec::AllBookmarks { remote_name } => {
-                        format!("push all tracked bookmarks to git remote {}", remote_name)
+                        format!("把所有已跟踪的分支上传到远程 {}", remote_name)
                     }
                     GitRefspec::AllRemotes { bookmark_ref } => {
-                        format!(
-                            "push {} to all tracked git remotes",
-                            bookmark_ref.as_bookmark()?
-                        )
+                        format!("把 {} 上传到所有已跟踪的远程", bookmark_ref.as_bookmark()?)
                     }
                     GitRefspec::RemoteBookmark {
                         remote_name,
                         bookmark_ref,
                     } => {
                         format!(
-                            "push {} to git remote {}",
+                            "把 {} 上传到远程 {}",
                             bookmark_ref.as_bookmark()?,
                             remote_name
                         )
@@ -621,7 +615,7 @@ impl Mutation for UndoOperation {
 
         if let Some(op_workspace_name) = other_workspace_name(ws, &target_op) {
             precondition!(
-                "Refusing to undo operation {} because it was performed in workspace {}",
+                "不能撤销操作 {}，因为它是在工作区 {} 里执行的",
                 short_operation_hash(target_op.id()),
                 op_workspace_name.as_symbol()
             );
@@ -629,10 +623,10 @@ impl Mutation for UndoOperation {
 
         let mut parent_ops = target_op.parents().await?.into_iter();
         let Some(mut restore_op) = parent_ops.next() else {
-            precondition!("Cannot undo repo initialization");
+            precondition!("不能撤销仓库初始化");
         };
         if parent_ops.next().is_some() {
-            precondition!("Cannot undo a merge operation");
+            precondition!("不能撤销合并操作");
         };
 
         // restore what an undo restored rather than the undo itself
@@ -669,12 +663,12 @@ impl Mutation for RedoOperation {
             .description
             .starts_with(UNDO_OP_DESC_PREFIX)
         {
-            precondition!("Nothing to redo");
+            precondition!("没有可以重做的操作");
         }
 
         if let Some(op_workspace_name) = other_workspace_name(ws, &target_op) {
             precondition!(
-                "Refusing to redo operation {} because it was performed in workspace {}",
+                "不能重做操作 {}，因为它是在工作区 {} 里执行的",
                 short_operation_hash(target_op.id()),
                 op_workspace_name.as_symbol()
             );
@@ -753,10 +747,10 @@ impl Mutation for ForgetWorkspace {
         let workspace_name: WorkspaceNameBuf = self.name.into();
 
         let Some(wc_id) = ws.view().get_wc_commit_id(&workspace_name) else {
-            precondition!("Workspace '{}' not found", workspace_name.as_symbol());
+            precondition!("找不到工作区 '{}'", workspace_name.as_symbol());
         };
         if *workspace_name == *ws.name() {
-            precondition!("Cannot forget the current workspace");
+            precondition!("不能从列表中移除当前工作区");
         }
 
         let wc_commit = ws.get_commit(wc_id)?;
@@ -776,7 +770,7 @@ impl Mutation for ForgetWorkspace {
         let new_status = ws
             .finish_transaction(
                 tx,
-                format!("forget workspace '{}'", workspace_name.as_symbol()),
+                format!("从列表中移除工作区 '{}'", workspace_name.as_symbol()),
             )
             .await?;
 
@@ -802,7 +796,7 @@ impl Mutation for RenameWorkspace {
         _options: &MutationOptions,
     ) -> Result<MutationResult> {
         if self.new_name.is_empty() {
-            precondition!("New workspace name cannot be empty");
+            precondition!("新工作区名不能为空");
         }
 
         let old_name: WorkspaceNameBuf = self.name.into();
@@ -813,13 +807,13 @@ impl Mutation for RenameWorkspace {
         }
 
         if ws.view().get_wc_commit_id(&old_name).is_none() {
-            precondition!("Workspace '{}' not found", old_name.as_symbol());
+            precondition!("找不到工作区 '{}'", old_name.as_symbol());
         }
         if ws.view().get_wc_commit_id(&new_name).is_some() {
-            precondition!("Workspace '{}' already exists", new_name.as_symbol());
+            precondition!("工作区 '{}' 已经存在", new_name.as_symbol());
         }
         if *old_name != *ws.name() {
-            precondition!("Can only rename the current workspace");
+            precondition!("只能重命名当前工作区");
         }
 
         match ws.rename_workspace(old_name, new_name).await? {
@@ -1223,7 +1217,7 @@ auto-track = "glob:*.txt"
         assert_eq!(wc_description(&ws)?, "second\n");
 
         let result = RedoOperation.execute_unboxed(&mut ws).await?;
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("Nothing to redo"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("没有可以重做的操作"));
 
         Ok(())
     }
@@ -1241,7 +1235,7 @@ auto-track = "glob:*.txt"
         assert!(!ws.format_status().can_redo);
 
         let result = RedoOperation.execute_unboxed(&mut ws).await?;
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("Nothing to redo"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("没有可以重做的操作"));
         assert_eq!(wc_description(&ws)?, "replacement\n");
 
         Ok(())
@@ -1278,7 +1272,7 @@ auto-track = "glob:*.txt"
         let mut ws = session.load_workspace(repo.path()).await?;
         let result = UndoOperation.execute_unboxed(&mut ws).await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("performed in workspace second"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("是在工作区 second 里执行的"));
 
         Ok(())
     }
@@ -1296,7 +1290,7 @@ auto-track = "glob:*.txt"
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("current workspace"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("当前工作区"));
 
         Ok(())
     }
@@ -1314,7 +1308,7 @@ auto-track = "glob:*.txt"
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("not found"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("找不到工作区"));
 
         Ok(())
     }
@@ -1386,7 +1380,7 @@ auto-track = "glob:*.txt"
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("cannot be empty"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("新工作区名不能为空"));
 
         Ok(())
     }
@@ -1408,7 +1402,7 @@ auto-track = "glob:*.txt"
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("already exists"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("已经存在"));
 
         Ok(())
     }
@@ -1430,7 +1424,7 @@ auto-track = "glob:*.txt"
         .execute_unboxed(&mut ws)
         .await?;
 
-        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("current workspace"));
+        assert_matches!(result, MutationResult::PreconditionError { message } if message.contains("当前工作区"));
 
         Ok(())
     }

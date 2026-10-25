@@ -329,6 +329,7 @@ pub fn run_gui(options: super::RunOptions) -> Result<()> {
             query_log_next_page,
             query_revisions,
             query_remotes,
+            query_branches,
             query_snapshot,
             abandon_revisions,
             backout_revisions,
@@ -685,6 +686,23 @@ fn query_remotes(
             tx: call_tx,
             tracking_bookmark,
         })
+        .map_err(InvokeError::from_error)?;
+    call_rx
+        .recv()
+        .map_err(InvokeError::from_error)?
+        .map_err(InvokeError::from_anyhow)
+}
+
+#[tauri::command(async)]
+fn query_branches(
+    window: Window,
+    app_state: State<AppState>,
+) -> Result<Vec<messages::queries::BranchInfo>, InvokeError> {
+    let session_tx: Sender<SessionEvent> = app_state.get_session(window.label());
+    let (call_tx, call_rx) = channel();
+
+    session_tx
+        .send(SessionEvent::QueryBranches { tx: call_tx })
         .map_err(InvokeError::from_error)?;
     call_rx
         .recv()

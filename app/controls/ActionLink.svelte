@@ -11,19 +11,19 @@
 
 <style>
     button {
-        height: 24px;
+        height: var(--height-compact);
         padding: 0;
         margin: 0;
-        padding: 1px;
 
         background: none;
         border: none;
+        border-radius: var(--radius-small);
 
         color: var(--ctp-sapphire);
-        font-family: var(--stack-industrial);
-        font-size: 16px;
+        font-family: var(--stack-text);
+        font-size: var(--size-small-text);
 
-        display: flex;
+        display: inline-flex;
         align-items: center;
         cursor: pointer;
     }
@@ -33,17 +33,12 @@
             color: var(--ctp-teal);
         }
         &:focus-visible {
-            text-decoration: underline;
-            outline: solid 2px var(--ctp-lavender);
-            border-radius: 3px;
-        }
-        &:active {
-            text-decoration: underline;
+            outline: 2px solid var(--ctp-lavender);
+            outline-offset: 1px;
         }
     }
 
     button:disabled {
-        background: var(--ctp-mantle);
         color: var(--ctp-overlay2);
     }
 </style>

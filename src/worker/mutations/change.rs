@@ -41,7 +41,7 @@ impl Mutation for MoveChanges {
         // resolve & check destination
         let to_id = CommitId::try_from_hex(&self.to_id.hex).expect("frontend-validated id");
         if ws.check_immutable([to_id.clone()])? && !options.ignore_immutable {
-            precondition!("Destination revision is immutable");
+            precondition!("目标改动已经定稿，不能修改");
         }
 
         let mut to = ws.get_commit(&to_id)?;
@@ -49,7 +49,7 @@ impl Mutation for MoveChanges {
         // resolve & check source
         let (from_commits, is_immutable) = ws.resolve_change_set(&self.from, true)?;
         if is_immutable && !options.ignore_immutable {
-            precondition!("Some source revisions are immutable");
+            precondition!("有些源改动已经定稿，不能修改");
         }
 
         let from_newest = from_commits
@@ -167,7 +167,7 @@ impl Mutation for MoveChanges {
             .finish_transaction(
                 tx,
                 format!(
-                    "move changes from {}::{} to {}",
+                    "把改动内容从 {}::{} 移动到 {}",
                     from_oldest.id().hex(),
                     from_newest.id().hex(),
                     to.id().hex()
@@ -200,9 +200,9 @@ impl Mutation for CopyChanges {
         let (commits, is_immutable) = ws.resolve_change_set(&self.to_set, true)?;
         if is_immutable && !options.ignore_immutable {
             if commits.len() == 1 {
-                precondition!("Destination revision is immutable");
+                precondition!("目标改动已经定稿，不能修改");
             } else {
-                precondition!("Some destination revisions are immutable");
+                precondition!("有些目标改动已经定稿，不能修改");
             }
         }
 
@@ -240,9 +240,9 @@ impl Mutation for CopyChanges {
         tx.repo_mut().rebase_descendants().await?;
 
         let description = if commits.len() == 1 {
-            format!("restore into commit {}", commits[0].id().hex())
+            format!("恢复到改动 {}", commits[0].id().hex())
         } else {
-            format!("restore into {} commits", commits.len())
+            format!("恢复到 {} 个改动", commits.len())
         };
 
         match ws.finish_transaction(tx, description).await? {
@@ -268,7 +268,7 @@ impl Mutation for MoveHunk {
         if ws.check_immutable(vec![from.id().clone(), to.id().clone()])?
             && !options.ignore_immutable
         {
-            precondition!("Some revisions are immutable");
+            precondition!("有些改动已经定稿，不能修改");
         }
 
         // Split-rebase-squash algorithm:
@@ -282,7 +282,7 @@ impl Mutation for MoveHunk {
         let from_tree = from.tree();
         let from_parents = from.parents().await?;
         if from_parents.len() != 1 {
-            precondition!("Cannot move hunk from a merge commit");
+            precondition!("不能从合并过的改动里移动局部内容");
         }
         let base_tree = from_parents[0].tree();
 
@@ -453,7 +453,7 @@ impl Mutation for MoveHunk {
             .finish_transaction(
                 tx,
                 format!(
-                    "move hunk in {} from {} to {}",
+                    "把 {} 里的改动片段从 {} 移动到 {}",
                     self.path.repo_path,
                     from.id().hex(),
                     to.id().hex()
@@ -484,7 +484,7 @@ impl Mutation for CopyHunk {
         let repo_path = RepoPath::from_internal_string(&self.path.repo_path)?;
 
         if ws.check_immutable(vec![to.id().clone()])? && !options.ignore_immutable {
-            precondition!("Revision is immutable");
+            precondition!("这个改动已经定稿，不能修改");
         }
 
         let store = tx.repo().store();
@@ -493,7 +493,7 @@ impl Mutation for CopyHunk {
         // vheck for conflicts in destination
         let to_path_value = to_tree.path_value(repo_path).await?;
         if to_path_value.into_resolved().is_err() {
-            precondition!("Cannot restore hunk: destination file has conflicts");
+            precondition!("不能恢复局部内容：目标文件里有冲突");
         }
 
         // read destination content
@@ -506,7 +506,7 @@ impl Mutation for CopyHunk {
         let to_end_0based = to_start_0based + self.hunk.location.to_file.len;
         if to_end_0based > to_lines.len() {
             precondition!(
-                "Hunk location out of bounds: file has {} lines, hunk requires lines {}-{}",
+                "局部内容的位置超出范围：文件一共 {} 行，这段内容需要第 {}-{} 行",
                 to_lines.len(),
                 self.hunk.location.to_file.start,
                 to_end_0based
@@ -561,7 +561,7 @@ impl Mutation for CopyHunk {
         let from_end_0based = from_start_0based + self.hunk.location.from_file.len;
         if from_end_0based > from_lines.len() {
             precondition!(
-                "Source hunk location out of bounds: file has {} lines, hunk requires lines {}-{}",
+                "源文件里局部内容的位置超出范围：文件一共 {} 行，这段内容需要第 {}-{} 行",
                 from_lines.len(),
                 self.hunk.location.from_file.start,
                 from_end_0based
@@ -620,7 +620,7 @@ impl Mutation for CopyHunk {
             .finish_transaction(
                 tx,
                 format!(
-                    "restore hunk in {} from {} into {}",
+                    "把 {} 里的改动片段从 {} 恢复到 {}",
                     self.path.repo_path, self.from_id.hex, self.to_id.commit.hex
                 ),
             )
@@ -2130,7 +2130,7 @@ mod tests {
         match result {
             Ok(MutationResult::PreconditionError { message }) => {
                 assert!(
-                    message.contains("conflict"),
+                    message.contains("冲突"),
                     "Expected error message about conflicts, got: {}",
                     message
                 );
@@ -2176,7 +2176,7 @@ mod tests {
         match result {
             Ok(MutationResult::PreconditionError { message }) => {
                 assert!(
-                    message.contains("out of bounds"),
+                    message.contains("超出范围"),
                     "Expected error about bounds, got: {}",
                     message
                 );

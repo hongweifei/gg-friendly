@@ -43,9 +43,10 @@
     #dialog-chrome {
         grid-area: 2/2/2/2;
 
-        background: var(--ctp-mantle);
-        border-radius: 9px;
-        border: 3px solid var(--ctp-overlay1);
+        background: var(--ctp-base);
+        border-radius: var(--radius-control);
+        border: 1px solid var(--ctp-surface0);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 
         display: grid;
         grid-template-columns: 30px 1fr 33px;
@@ -75,7 +76,7 @@
 
     #dialog-content :global(select),
     #dialog-content :global(input) {
-        height: 30px;
+        height: var(--height-compact);
         min-width: 30px;
 
         font-family: var(--stack-code);

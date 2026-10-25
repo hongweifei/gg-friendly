@@ -1,5 +1,5 @@
 import type { MutationResult } from "./messages/MutationResult";
-import { currentInput, currentMutation, progressEvent, repoConfigEvent, repoStatusEvent, revisionSelectEvent } from "./stores";
+import { currentInput, currentMutation, progressEvent, repoConfigEvent, repoStatusEvent, repoChanges, revisionSelectEvent } from "./stores";
 import { isTauri, type Query } from "./events";
 
 export { isTauri, onEvent, type Query, type Settable } from "./events";
@@ -114,6 +114,9 @@ export async function mutate<T>(command: string, mutation: T, options?: { operat
                     });
                 }
             }
+            // The operation may have changed the repository without moving the
+            // working copy, so the status alone doesn't tell the whole story.
+            repoChanges.update((n) => n + 1);
             currentMutation.set(null);
             return true;
         }

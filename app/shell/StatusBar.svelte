@@ -61,7 +61,7 @@
         mutate<GitPush>(
             "git_push",
             { refspec: { type: "AllBookmarks", remote_name }, input: null },
-            { operation: `Pushing to ${remote_name}...` },
+            { operation: `正在上传到 ${remote_name}...` },
         );
     }
 
@@ -69,7 +69,7 @@
         mutate<GitFetch>(
             "git_fetch",
             { refspec: { type: "AllBookmarks", remote_name }, input: null },
-            { operation: `Fetching from ${remote_name}...` },
+            { operation: `正在从 ${remote_name} 下载...` },
         );
     }
 </script>
@@ -77,20 +77,25 @@
 {#if !dropHint}
     <div id="status-bar" class="repo-bar" inert={$hasModal}>
         <div class="substatus">
-            <ToggleWidget tip="ignore immutability" bind:checked={$ignoreToggled} safe on="shield-off" off="shield" />
+            <ToggleWidget
+                tip="允许修改已经定稿的改动"
+                bind:checked={$ignoreToggled}
+                safe
+                on="shield-off"
+                off="shield" />
             <span id="status-workspace">
-                {$repoConfigEvent?.type == "Workspace" ? $repoConfigEvent.absolute_path : "No workspace"}
+                {$repoConfigEvent?.type == "Workspace" ? $repoConfigEvent.absolute_path : "没有打开仓库"}
             </span>
         </div>
         <div id="status-remotes" class="substatus">
             {#if $repoConfigEvent?.type == "Workspace"}
                 {#each $repoConfigEvent.git_remotes as remote}
                     <div class="substatus">
-                        <ActionWidget tip="git push (all bookmarks)" onClick={() => onPush(remote)}>
+                        <ActionWidget tip="把所有分支上传到 {remote}" onClick={() => onPush(remote)}>
                             <Icon name="upload-cloud" />
                         </ActionWidget>
                         <span>{remote}</span>
-                        <ActionWidget tip="git fetch" onClick={() => onFetch(remote)}>
+                        <ActionWidget tip="从 {remote} 下载最新内容" onClick={() => onFetch(remote)}>
                             <Icon name="download-cloud" />
                         </ActionWidget>
                     </div>
@@ -101,14 +106,14 @@
             <span>
                 {$repoConfigEvent?.type != "Workspace"
                     ? ""
-                    : ($repoStatusEvent?.operation_description ?? "no operation")}
+                    : ($repoStatusEvent?.operation_description ?? "还没有操作")}
             </span>
-            <ActionWidget tip="undo latest operation" onClick={onUndo} disabled={$repoConfigEvent?.type != "Workspace"}>
-                <Icon name="rotate-ccw" /> Undo
+            <ActionWidget tip="撤销上一步" onClick={onUndo} disabled={$repoConfigEvent?.type != "Workspace"}>
+                <Icon name="rotate-ccw" /> 撤销
             </ActionWidget>
             {#if $repoConfigEvent?.type == "Workspace" && $repoStatusEvent?.can_redo}
-                <ActionWidget tip="redo latest undone operation" onClick={onRedo}>
-                    <Icon name="rotate-cw" /> Redo
+                <ActionWidget tip="重做刚才撤销的操作" onClick={onRedo}>
+                    <Icon name="rotate-cw" /> 重做
                 </ActionWidget>
             {/if}
         </div>

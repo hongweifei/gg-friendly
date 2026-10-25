@@ -7,64 +7,181 @@
     import Pane from "./shell/Pane.svelte";
     import TitlebarInset from "./shell/TitlebarInset.svelte";
     import SetSpan from "./controls/SetSpan.svelte";
+    import TopBar from "./shell/TopBar.svelte";
+    import BranchPane from "./shell/BranchPane.svelte";
+    import type { BranchInfo } from "./messages/BranchInfo";
+    import type { RepoStatus } from "./messages/RepoStatus";
+    import { branchFilter, ignoreToggled, logQueryRequest, repoChanges, repoStatusEvent, revisionSelectEvent } from "./stores.js";
+    import { getInput, mutate, query } from "./ipc.js";
+    import type { CreateRevision } from "./messages/CreateRevision";
+    import type { GitPush } from "./messages/GitPush";
+    import type { GitFetch } from "./messages/GitFetch";
+    import type { CreateRef } from "./messages/CreateRef";
+    import type { StoreRef } from "./messages/StoreRef";
+    import type { RevId } from "./messages/RevId";
+    import { get } from "svelte/store";
 
     let route = parseRoute();
-    let leftFraction = 0.5; // 50/50 split
-    let isDragging = false;
 
-    let minFraction = 0.1;
-    let maxFraction = 0.9;
-    let keyboardStep = 0.05;
+    let branches: BranchInfo[] = [];
+    let selectedBranch: string | null = null;
+    // the working copy is its own change, not on any branch
+    $: workingCopyId = $repoStatusEvent?.working_copy.hex ?? null;
 
-    function resize(fraction: number) {
-        leftFraction = Math.max(minFraction, Math.min(maxFraction, fraction));
-    }
-
-    function onMouseDown(e: MouseEvent) {
-        e.preventDefault();
-        isDragging = true;
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
-    }
-
-    function onMouseMove(e: MouseEvent) {
-        if (!isDragging) return;
-
-        let container = document.querySelector(".two-pane") as HTMLElement;
-        if (!container) return;
-
-        let rect = container.getBoundingClientRect();
-        resize((e.clientX - rect.left) / (rect.width - 4)); // 4px is separator width
-    }
-
-    function onMouseUp() {
-        isDragging = false;
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-    }
-
-    function onKeyDown(e: KeyboardEvent) {
-        switch (e.key) {
-            case "ArrowLeft":
-                resize(leftFraction - keyboardStep);
-                break;
-            case "ArrowRight":
-                resize(leftFraction + keyboardStep);
-                break;
-            case "Home":
-                resize(minFraction);
-                break;
-            case "End":
-                resize(maxFraction);
-                break;
-            default:
-                return;
+    // the branch list is asked for separately, so it holds every branch in
+    // the repository and not just the ones the change list happened to show
+    async function loadBranches() {
+        let result = await query<BranchInfo[]>("query_branches", null);
+        if (result.type === "data") {
+            branches = result.value;
         }
-        e.preventDefault();
+    }
+
+    // The branch list is read again whenever the repository changes. The
+    // change counter is what says so: renaming a branch or copying a change
+    // leaves the working copy alone, so the status looks the same afterwards.
+    // The workspace has to be loaded first, or the backend can't answer.
+    let lastRepoChanges = -1;
+    $: if ($repoStatusEvent && $repoChanges !== lastRepoChanges) {
+        lastRepoChanges = $repoChanges;
+        loadBranches();
+    }
+
+    /**
+     * What the branch list knows about each branch, so the table and the
+     * list never disagree about whether a branch is uploaded.
+     */
+    $: branchStates = Object.fromEntries(
+        branches.map((b) => [
+            b.is_local ? b.name : `${b.name}@${b.remote_name}`,
+            {
+                ahead: b.is_local && b.is_tracking && !b.is_synced,
+                synced: b.is_local && b.is_tracking && b.is_synced,
+                localOnly: b.is_local && !b.is_tracking,
+                absent: b.is_absent,
+            },
+        ]),
+    );
+
+    /**
+     * The local branches that have been uploaded and the ones that haven't.
+     * The change list's upload filters are built from these, so the filters
+     * and the row labels always agree.
+     */
+    $: publishedBranches = branches
+        .filter((b) => b.is_local && b.is_tracking && b.is_synced)
+        .map((b) => b.name);
+    $: unpublishedBranches = branches
+        .filter((b) => b.is_local && b.is_tracking && !b.is_synced)
+        .map((b) => b.name);
+
+    /**
+     * Picking a branch narrows the change list to it, the way other git
+     * tools do. Picking it again clears the narrowing.
+     */
+    function onSelectBranch(branch: BranchInfo) {
+        let name = branch.is_local ? branch.name : `${branch.name}@${branch.remote_name}`;
+
+        // picking the same branch again clears the narrowing
+        if (selectedBranch == name) {
+            selectedBranch = null;
+            branchFilter.set(null);
+            return;
+        }
+
+        selectedBranch = name;
+        let escaped = branch.name.replace(/["\\]/g, "\\$&");
+        branchFilter.set(
+            branch.is_local
+                ? `bookmarks(exact:"${escaped}")`
+                : `remote_bookmarks(exact:"${escaped}", exact:"${branch.remote_name}")`,
+        );
+    }
+
+    /**
+     * A new change is created on top of whatever is selected, so the button
+     * does the same thing as "new child" on the selected change.
+     */
+    function onPush(event: CustomEvent<{ remote: string }>) {
+        mutate<GitPush>(
+            "git_push",
+            { refspec: { type: "AllBookmarks", remote_name: event.detail.remote }, input: null },
+            { operation: `正在上传到 ${event.detail.remote}...` },
+        );
+    }
+
+    function onFetch(event: CustomEvent<{ remote: string }>) {
+        mutate<GitFetch>(
+            "git_fetch",
+            { refspec: { type: "AllBookmarks", remote_name: event.detail.remote }, input: null },
+            { operation: `正在从 ${event.detail.remote} 下载...` },
+        );
+    }
+
+    /**
+     * Creating a branch needs a name and a place to put it. The place is the
+     * change that is selected, or the working copy if nothing is selected.
+     */
+    async function onNewBranch() {
+        // the branch goes on the change that is selected, or on the working
+        // copy if nothing is selected
+        let selection = get(revisionSelectEvent);
+        let id: RevId | null = selection?.from ?? null;
+        if (!id) {
+            let wc = $repoStatusEvent?.working_copy;
+            if (!wc) {
+                return;
+            }
+            id = {
+                change: {
+                    type: "ChangeId",
+                    hex: "",
+                    prefix: "",
+                    rest: "",
+                    offset: null,
+                    is_divergent: false,
+                },
+                commit: wc,
+            };
+        }
+
+        let response = await getInput("新建分支", "", ["分支名称"]);
+        if (!response) {
+            return;
+        }
+
+        let name = response["分支名称"]?.trim();
+        if (!name) {
+            return;
+        }
+
+        let ref: StoreRef = {
+            type: "LocalBookmark",
+            bookmark_name: name,
+            has_conflict: false,
+            is_synced: false,
+            potential_remotes: 0,
+            available_remotes: 0,
+            tracking_remotes: [],
+        };
+
+        mutate<CreateRef>("create_ref", { ref, id: id as RevId }, { ignoreImmutable: $ignoreToggled });
+        await loadBranches();
+    }
+
+    function onNewChange() {
+        let selection = get(revisionSelectEvent);
+        if (!selection) {
+            logQueryRequest.set("");
+            return;
+        }
+        mutate<CreateRevision>("create_revision", { set: selection });
     }
 </script>
 
-<Shell revsetOverride={route.type === "revision" ? route.revset : null} let:workspace let:selection>
+<Shell revsetOverride={route.type === "revision" ? route.revset : null} let:workspace let:selection let:selectedBranchNames>
+    <TopBar slot="banner" on:newChange={onNewChange} on:push={onPush} on:fetch={onFetch} />
+
     {#if route.type === "log"}
         <!-- key on the whole config, not its path - reopening the same repo must remount -->
         {#key workspace}
@@ -76,95 +193,87 @@
                 <RevisionPane revs={data} />
             {:else}
                 <Pane>
-                    <h2 slot="header">Not Found</h2>
+                    <h2 slot="header">没有找到</h2>
                     <p slot="body">
-                        Empty revision set <SetSpan set={data.set} />.
+                        空的改动集合 <SetSpan set={data.set} />。
                     </p>
                 </Pane>
             {/if}
             <Pane slot="error" let:message>
-                <h2 slot="header">Error</h2>
+                <h2 slot="header">出错了</h2>
                 <p slot="body">{message}</p>
             </Pane>
             <Pane slot="wait">
-                <h2 slot="header">Loading...</h2>
+                <h2 slot="header">正在加载...</h2>
             </Pane>
         </BoundQuery>
     {:else}
-        <div class="two-pane" style="--left-fraction: {leftFraction}fr; --right-fraction: {1 - leftFraction}fr;">
+        <div class="workspace">
             <TitlebarInset>
-                <!-- key on the whole config, not its path - reopening the same repo must remount -->
-                {#key workspace}
-                    <LogPane query_choices={workspace.query_choices} latest_query={workspace.latest_query} />
-                {/key}
+                <BranchPane
+                {branches}
+                {selectedBranch}
+                {workingCopyId}
+                {selectedBranchNames}
+                onSelect={onSelectBranch}
+                onNewBranch={onNewBranch} />
             </TitlebarInset>
 
-            <!-- svelte-ignore a11y_no_interactive_element_to_noninteractive_role (a focusable separator is a widget, per the aria window splitter pattern) -->
-            <button
-                type="button"
-                class="separator"
-                role="separator"
-                aria-label="Resize log pane"
-                aria-orientation="vertical"
-                aria-valuenow={Math.round(leftFraction * 100)}
-                aria-valuemin={minFraction * 100}
-                aria-valuemax={maxFraction * 100}
-                on:mousedown={onMouseDown}
-                on:keydown={onKeyDown}
-                class:dragging={isDragging}>
-            </button>
+            <div class="main">
+                <!-- key on the whole config, not its path - reopening the same repo must remount -->
+                {#key workspace}
+                    <LogPane
+                        query_choices={workspace.query_choices}
+                        latest_query={workspace.latest_query}
+                        {branchStates}
+                        {publishedBranches}
+                        {unpublishedBranches} />
+                {/key}
 
-            <BoundQuery query={selection} let:data>
-                {#if data.type == "Detail"}
-                    <RevisionPane revs={data} />
-                {:else}
-                    <Pane titlebar>
-                        <h2 slot="header">Not Found</h2>
-                        <p slot="body">
-                            Empty revision set <SetSpan set={data.set} />.
-                        </p>
+                <div class="divider" role="separator" aria-orientation="horizontal"></div>
+
+                <BoundQuery query={selection} let:data>
+                    {#if data.type == "Detail"}
+                        <RevisionPane revs={data} />
+                    {:else}
+                        <Pane titlebar>
+                            <h2 slot="header">没有找到</h2>
+                            <p slot="body">
+                                空的改动集合 <SetSpan set={data.set} />。
+                            </p>
+                        </Pane>
+                    {/if}
+                    <Pane titlebar slot="error" let:message>
+                        <h2 slot="header">出错了</h2>
+                        <p slot="body">{message}</p>
                     </Pane>
-                {/if}
-                <Pane titlebar slot="error" let:message>
-                    <h2 slot="header">Error</h2>
-                    <p slot="body">{message}</p>
-                </Pane>
-                <Pane titlebar slot="wait">
-                    <h2 slot="header">Loading...</h2>
-                </Pane>
-            </BoundQuery>
+                    <Pane titlebar slot="wait">
+                        <h2 slot="header">正在加载...</h2>
+                    </Pane>
+                </BoundQuery>
+            </div>
         </div>
     {/if}
 </Shell>
 
 <style>
-    .two-pane {
+    .workspace {
         display: grid;
-        grid-template-columns: var(--left-fraction) 4px var(--right-fraction);
+        grid-template-columns: 210px minmax(0, 1fr);
         height: 100%;
         overflow: hidden;
     }
 
-    .separator {
+    .main {
+        display: grid;
+        /* the change list gets a third of the height, the files and the diff
+           below it get the rest */
+        grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1.6fr);
+        overflow: hidden;
+        min-width: 0;
+    }
+
+    .divider {
         background: var(--ctp-overlay0);
-        cursor: col-resize;
-        user-select: none;
-        width: 4px;
-        margin-left: -2.5px;
-        border: none;
-        padding: 0;
-    }
-
-    .separator:hover {
-        background: var(--ctp-overlay2);
-    }
-
-    .separator:focus-visible {
-        outline: none;
-    }
-
-    .separator.dragging,
-    .separator:focus-visible {
-        background: var(--ctp-lavender);
     }
 </style>

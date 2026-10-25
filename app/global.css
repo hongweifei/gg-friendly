@@ -24,6 +24,23 @@
     "Nimbus Sans",
     sans-serif-condensed,
     sans-serif;
+  --stack-text: system-ui,
+    -apple-system,
+    "Segoe UI",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif;
+
+  /* the shape of every control in the interface */
+  --radius-control: 8px;
+  --radius-small: 6px;
+  --radius-chip: 13px;
+  --height-control: 34px;
+  --height-compact: 28px;
+  --size-control-text: 13.5px;
+  --size-small-text: 12.5px;
 }
 
 #shell,
@@ -59,6 +76,23 @@
   --ctp-pink: var(--ctp-latte-pink);
   --ctp-flamingo: var(--ctp-latte-flamingo);
   --ctp-rosewater: var(--ctp-latte-rosewater);
+
+  /* identifiers keep their own colour so a change id and a commit id can be
+     told apart at a glance, darkened for the light background to stay readable */
+  --id-commit: #6d3bc4;
+  --id-change: #b5206b;
+  --id-divergent: #a00d2c;
+
+  /* added and removed lines in a diff, darkened for the light background */
+  --diff-add: #245c12;
+  --diff-remove: #8a0a24;
+
+  /* the colours used for state tags, darkened for the light background */
+  --tag-branch: #0d5c6b;
+  --tag-warn: #8f3800;
+  --tag-ok: #245c12;
+  --tag-danger: #8a0a24;
+  --tag-info: #1449b0;
 }
 
 #shell.dark {
@@ -92,6 +126,19 @@
   --ctp-pink: var(--ctp-macchiato-pink);
   --ctp-flamingo: var(--ctp-macchiato-flamingo);
   --ctp-rosewater: var(--ctp-macchiato-rosewater);
+
+  --id-commit: #c297e8;
+  --id-change: #f5a3c7;
+  --id-divergent: #f38ba8;
+
+  --diff-add: #a6da95;
+  --diff-remove: #ed8796;
+
+  --tag-branch: #8bd5ca;
+  --tag-warn: #f5a97f;
+  --tag-ok: #a6da95;
+  --tag-danger: #ed8796;
+  --tag-info: #8aadf4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -126,6 +173,19 @@
     --ctp-pink: var(--ctp-macchiato-pink);
     --ctp-flamingo: var(--ctp-macchiato-flamingo);
     --ctp-rosewater: var(--ctp-macchiato-rosewater);
+
+    --id-commit: #c297e8;
+    --id-change: #f5a3c7;
+    --id-divergent: #f38ba8;
+
+    --diff-add: #a6da95;
+    --diff-remove: #ed8796;
+
+    --tag-branch: #8bd5ca;
+    --tag-warn: #f5a97f;
+    --tag-ok: #a6da95;
+    --tag-danger: #ed8796;
+    --tag-info: #8aadf4;
   }
 }
 
@@ -154,12 +214,19 @@ html:has(#shell.dark) {
   color: var(--ctp-rosewater);
 }
 
+/* the interface is read in Chinese, so the body uses a text stack that handles it */
+body {
+  font-family: var(--stack-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 textarea,
 select,
 input {
   outline: none;
-  border: 1px solid var(--ctp-overlay0);
-  border-radius: 3px;
+  border: 1px solid var(--ctp-surface0);
+  border-radius: var(--radius-control);
   padding: 1px;
 
   &:focus-visible {
@@ -195,8 +262,8 @@ input {
 @supports (appearance: base-select) {
   ::picker(select) {
     outline: none;
-    border: 1px solid var(--ctp-overlay0);
-    border-radius: 3px;
+    border: 1px solid var(--ctp-surface0);
+    border-radius: var(--radius-control);
     padding: 1px;
 
     background-color: var(--ctp-base);

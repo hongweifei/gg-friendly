@@ -112,8 +112,8 @@
     {/each}
     <div class="separator"></div>
     <svelte:fragment slot="commands">
-        <ActionWidget safe onClick={onEnter}>Enter</ActionWidget>
-        <ActionWidget safe onClick={onCancel}>Cancel</ActionWidget>
+        <ActionWidget safe onClick={onEnter}>确定</ActionWidget>
+        <ActionWidget secondary onClick={onCancel}>取消</ActionWidget>
     </svelte:fragment>
 </ModalDialog>
 

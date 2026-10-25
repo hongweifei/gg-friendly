@@ -12,17 +12,22 @@
     export let y: number;
     export let onClose: () => void;
 
+    // The menu keeps its own copy of the operand. Clicking a menu entry
+    // clears the shared context before the entry's handler runs, so reading
+    // the prop at that point would find nothing.
+    let target: Operand = operand;
+
     function getRevisionHeaders(): RevHeader[] {
-        if (operand.type === "Revision") {
-            return [operand.header];
-        } else if (operand.type === "Revisions") {
-            return operand.headers;
+        if (target.type === "Revision") {
+            return [target.header];
+        } else if (target.type === "Revisions") {
+            return target.headers;
         }
         return [];
     }
 
     function onClick(action: string) {
-        handleCommand(operand, action, $ignoreToggled);
+        handleCommand(target, action, $ignoreToggled);
         onClose();
     }
 
@@ -84,12 +89,12 @@
     }
 
     $: revisionEnabled =
-        operand.type === "Revision" || operand.type === "Revisions"
+        target.type === "Revision" || target.type === "Revisions"
             ? isRevisionEnabled(getRevisionHeaders(), $ignoreToggled)
             : null;
-    $: changeEnabled = operand.type === "Change" ? isChangeEnabled(operand.headers, $ignoreToggled) : null;
-    $: refEnabled = operand.type === "Ref" ? isRefEnabled(operand.ref) : null;
-    $: defaultCommand = operand.type === "Ref" ? RefMutator.defaultCommand(operand.ref) : null;
+    $: changeEnabled = target.type === "Change" ? isChangeEnabled(target.headers, $ignoreToggled) : null;
+    $: refEnabled = target.type === "Ref" ? isRefEnabled(target.ref) : null;
+    $: defaultCommand = target.type === "Ref" ? RefMutator.defaultCommand(target.ref) : null;
 
     // clamp to viewport
     let menuElement: HTMLDivElement;
@@ -117,47 +122,48 @@
     on:click|stopPropagation
     on:keydown={onKeyDown}
     bind:this={menuElement}>
-    {#if (operand.type === "Revision" || operand.type === "Revisions") && revisionEnabled}
-        <button disabled={!revisionEnabled.new_child} on:click={() => onClick("new_child")}>New child</button>
+    {#if (target.type === "Revision" || target.type === "Revisions") && revisionEnabled}
+        <button disabled={!revisionEnabled.new_child} on:click={() => onClick("new_child")}>新建子改动</button>
         <button disabled={!revisionEnabled.new_parent} on:click={() => onClick("new_parent")}
-            >New inserted parent</button>
+            >在上一个改动之前插入</button>
         <hr />
-        <button disabled={!revisionEnabled.edit} on:click={() => onClick("edit")}>Edit as working copy</button>
-        <button disabled={!revisionEnabled.revert} on:click={() => onClick("revert")}>Revert into working copy</button>
-        <button disabled={!revisionEnabled.duplicate} on:click={() => onClick("duplicate")}>Duplicate</button>
-        <button disabled={!revisionEnabled.abandon} on:click={() => onClick("abandon")}>Abandon</button>
+        <button disabled={!revisionEnabled.edit} on:click={() => onClick("edit")}>编辑这个改动</button>
+        <button disabled={!revisionEnabled.revert} on:click={() => onClick("revert")}
+            >把改动内容恢复到工作副本</button>
+        <button disabled={!revisionEnabled.duplicate} on:click={() => onClick("duplicate")}>复制一份</button>
+        <button disabled={!revisionEnabled.abandon} on:click={() => onClick("abandon")}>放弃这个改动</button>
         <hr />
-        <button disabled={!revisionEnabled.squash} on:click={() => onClick("squash")}>Squash into parent</button>
-        <button disabled={!revisionEnabled.restore} on:click={() => onClick("restore")}>Restore from parent</button>
+        <button disabled={!revisionEnabled.squash} on:click={() => onClick("squash")}>合并到上一个改动</button>
+        <button disabled={!revisionEnabled.restore} on:click={() => onClick("restore")}>从上一个改动恢复</button>
         <hr />
-        <button disabled={!revisionEnabled.bookmark} on:click={() => onClick("bookmark")}>Create bookmark...</button>
-    {:else if operand.type === "Change" && changeEnabled}
-        <button disabled={!changeEnabled.squash} on:click={() => onClick("squash")}>Squash into parent</button>
-        <button disabled={!changeEnabled.restore} on:click={() => onClick("restore")}>Restore from parent</button>
+        <button disabled={!revisionEnabled.bookmark} on:click={() => onClick("bookmark")}>新建分支...</button>
+    {:else if target.type === "Change" && changeEnabled}
+        <button disabled={!changeEnabled.squash} on:click={() => onClick("squash")}>合并到上一个改动</button>
+        <button disabled={!changeEnabled.restore} on:click={() => onClick("restore")}>从上一个改动恢复</button>
         <hr />
-        <button on:click={() => onClick("file_history")}>View file history</button>
-    {:else if operand.type === "Ref" && refEnabled}
+        <button on:click={() => onClick("file_history")}>查看这个文件的历史</button>
+    {:else if target.type === "Ref" && refEnabled}
         <button
             disabled={!refEnabled.track}
             class:defaulted={defaultCommand === "track"}
-            on:click={() => onClick("track")}>Track</button>
+            on:click={() => onClick("track")}>开始跟踪远程分支</button>
         <button
             disabled={!refEnabled.untrack}
             class:defaulted={defaultCommand === "untrack"}
-            on:click={() => onClick("untrack")}>Untrack</button>
+            on:click={() => onClick("untrack")}>停止跟踪远程分支</button>
         <hr />
-        <button disabled={!refEnabled.push_all} on:click={() => onClick("push-all")}>Push</button>
-        <button disabled={!refEnabled.push_single} on:click={() => onClick("push-single")}>Push to remote...</button>
-        <button disabled={!refEnabled.fetch_all} on:click={() => onClick("fetch-all")}>Fetch</button>
+        <button disabled={!refEnabled.push_all} on:click={() => onClick("push-all")}>上传</button>
+        <button disabled={!refEnabled.push_single} on:click={() => onClick("push-single")}>上传到指定远程...</button>
+        <button disabled={!refEnabled.fetch_all} on:click={() => onClick("fetch-all")}>下载</button>
         <button disabled={!refEnabled.fetch_single} on:click={() => onClick("fetch-single")}
-            >Fetch from remote...</button>
+            >从指定远程下载...</button>
         <hr />
-        <button disabled={!refEnabled.rename} on:click={() => onClick("rename")}>Rename...</button>
-        <button disabled={!refEnabled.delete} on:click={() => onClick("delete")}>Delete</button>
-    {:else if operand.type === "Workspace"}
-        <button class="defaulted" on:click={() => onClick("open")}>Open</button>
-        <button on:click={() => onClick("forget")}>Forget</button>
-        <button on:click={() => onClick("rename")}>Rename...</button>
+        <button disabled={!refEnabled.rename} on:click={() => onClick("rename")}>重命名...</button>
+        <button disabled={!refEnabled.delete} on:click={() => onClick("delete")}>删除</button>
+    {:else if target.type === "Workspace"}
+        <button class="defaulted" on:click={() => onClick("open")}>打开</button>
+        <button on:click={() => onClick("forget")}>从列表中移除</button>
+        <button on:click={() => onClick("rename")}>重命名...</button>
     {/if}
 </div>
 
@@ -165,43 +171,46 @@
     .context-menu {
         position: fixed;
         z-index: 1000;
-        background: var(--ctp-surface0);
-        border: 1px solid var(--ctp-overlay0);
-        border-radius: 3px;
-        box-shadow: 2px 2px var(--ctp-text);
+        background: var(--ctp-base);
+        border: 1px solid var(--ctp-surface0);
+        border-radius: var(--radius-control);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+        padding: 4px;
     }
 
     hr {
         border: none;
-        border-top: 1px solid var(--ctp-overlay0);
-        margin: 2px 0;
+        border-top: 1px solid var(--ctp-surface0);
+        margin: 4px 6px;
     }
 
     button {
         width: 100%;
         display: block;
         border: none;
-        padding: 4px 12px;
+        padding: 6px 10px;
+        border-radius: var(--radius-small);
 
         text-align: left;
         background: none;
         color: var(--ctp-text);
-        font-family: var(--stack-industrial);
+        font-family: var(--stack-text);
+        font-size: var(--size-control-text);
+        line-height: 1.4;
 
         &:disabled {
-            color: var(--ctp-overlay0);
+            color: var(--ctp-overlay1);
         }
 
         /* the command run by double-clicking the object */
         &.defaulted:not(:disabled) {
-            font-weight: bold;
+            font-weight: 600;
         }
 
         &:not(:disabled) {
             cursor: pointer;
             &:hover {
-                background: var(--ctp-flamingo);
-                color: black;
+                background: var(--ctp-surface0);
             }
         }
     }

@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { playwright } from "@vitest/browser-playwright";
+import { installedChromium } from "./e2e/browser";
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
@@ -32,7 +33,11 @@ export default defineConfig(async () => ({
           name: "app",
           include: ["app/**/*.test.ts"],
           browser: {
-            provider: playwright(),
+            provider: playwright({
+              launchOptions: {
+                executablePath: installedChromium(),
+              },
+            }),
             enabled: true,
             headless: true,
             instances: [{ browser: "chromium" }],

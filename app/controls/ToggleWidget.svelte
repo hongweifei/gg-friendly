@@ -33,80 +33,64 @@
 
 <style>
     button {
-        height: 24px;
-        font-size: 16px;
-        padding: 1px 3px;
+        width: 28px;
+        height: var(--height-compact);
+        padding: 0;
 
         outline: none;
         margin: 0;
-        border-width: 1px;
-        border-radius: 3px;
-        border-color: var(--ctp-overlay0);
-        box-shadow: 2px 2px var(--ctp-overlay0);
+        border: 1px solid var(--ctp-surface0);
+        border-radius: var(--radius-control);
 
-        background: var(--ctp-flamingo);
-        color: black;
+        background: var(--ctp-base);
+        color: var(--ctp-subtext1);
 
-        font-family: var(--stack-industrial);
-        display: flex;
+        display: inline-flex;
         align-items: center;
+        justify-content: center;
 
         cursor: pointer;
     }
 
     button:not(:disabled) {
         &:hover {
-            background: var(--ctp-maroon);
+            background: var(--ctp-surface0);
+            color: var(--ctp-text);
         }
         &:focus-visible {
-            border-color: var(--ctp-lavender);
-            border-width: 2px;
-            padding: 0px 2px;
-            text-decoration: underline;
-        }
-        &:active {
-            margin: 1px 0px 0px 1px;
-            padding: 1px 2px 0px 3px;
-            box-shadow: 1px 1px var(--ctp-overlay0);
-            &:focus-visible {
-                padding: 1px 1px 0px 2px;
-            }
+            outline: 2px solid var(--ctp-lavender);
+            outline-offset: 1px;
         }
     }
 
     button.checked:not(:disabled) {
-        margin: 1px 0px 0px 1px;
-        padding: 1px 2px 0px 3px;
-        box-shadow: 1px 1px var(--ctp-overlay0);
-        &:focus-visible {
-            padding: 1px 1px 0px 2px;
+        background: var(--ctp-lavender);
+        border-color: var(--ctp-lavender);
+        color: #1b1f2b;
+    }
+
+    button.safe:not(:disabled) {
+        color: white;
+        background: var(--ctp-blue);
+        border-color: var(--ctp-blue);
+
+        &:hover {
+            background: var(--ctp-sapphire);
         }
     }
 
-    button.safe {
-        background: var(--ctp-sapphire);
-        &:hover {
-            background: var(--ctp-teal);
-        }
-        &:active {
-            border-right-color: var(--ctp-teal);
-            border-bottom-color: var(--ctp-teal);
-        }
-    }
+    button.secondary:not(:disabled) {
+        background: var(--ctp-surface0);
+        border-color: var(--ctp-surface1);
 
-    button.secondary {
-        background: var(--ctp-surface2);
         &:hover {
-            background: var(--ctp-overlay2);
-        }
-        &:active {
-            border-right-color: var(--ctp-overlay2);
-            border-bottom-color: var(--ctp-overlay2);
+            background: var(--ctp-surface1);
         }
     }
 
     button:disabled {
         background: var(--ctp-mantle);
         color: var(--ctp-overlay2);
+        cursor: default;
     }
 </style>

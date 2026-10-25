@@ -30,19 +30,19 @@ pub fn build_main(
         ..Default::default()
     };
 
-    let repo_menu = Submenu::new(app_handle, "Repository", true)?;
+    let repo_menu = Submenu::new(app_handle, "仓库", true)?;
 
     repo_menu.append(&MenuItem::with_id(
         app_handle,
         "menu_repo_init",
-        "Init...",
+        "初始化仓库...",
         true,
         Some("cmdorctrl+shift+n"),
     )?)?;
     repo_menu.append(&MenuItem::with_id(
         app_handle,
         "menu_repo_clone",
-        "Clone...",
+        "克隆仓库...",
         true,
         Some("cmdorctrl+shift+o"),
     )?)?;
@@ -52,20 +52,20 @@ pub fn build_main(
     repo_menu.append(&MenuItem::with_id(
         app_handle,
         "menu_repo_open",
-        "Open...",
+        "打开仓库...",
         true,
         Some("cmdorctrl+o"),
     )?)?;
     repo_menu.append(&MenuItem::with_id(
         app_handle,
         "menu_repo_reopen",
-        "Reopen",
+        "重新载入",
         true,
         Some("f5"),
     )?)?;
 
     if !recent_items.is_empty() {
-        let recent_submenu = Submenu::new(app_handle, "Open Recent", true)?;
+        let recent_submenu = Submenu::new(app_handle, "最近打开", true)?;
         for path in recent_items.iter().take(10) {
             let label = abbreviate_path(path);
             let id = format!("recent:{}", path);
@@ -78,28 +78,25 @@ pub fn build_main(
 
     repo_menu.append(&PredefinedMenuItem::separator(app_handle)?)?;
 
-    repo_menu.append(&PredefinedMenuItem::close_window(
-        app_handle,
-        Some("Close"),
-    )?)?;
+    repo_menu.append(&PredefinedMenuItem::close_window(app_handle, Some("关闭"))?)?;
 
     let revision_menu = Submenu::with_id_and_items(
         app_handle,
         "revision",
-        "Revision",
+        "改动",
         true,
         &[
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_new_child",
-                "New child",
+                "新建子改动",
                 true,
                 Some("cmdorctrl+n"),
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_new_parent",
-                "New inserted parent",
+                "在上一个改动之前插入",
                 true,
                 Some("cmdorctrl+m"),
             )?,
@@ -107,28 +104,28 @@ pub fn build_main(
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_edit",
-                "Edit as working copy",
+                "编辑这个改动",
                 true,
                 Some("enter"),
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_revert",
-                "Revert into working copy",
+                "把改动内容恢复到工作副本",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_duplicate",
-                "Duplicate",
+                "复制一份",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_abandon",
-                "Abandon",
+                "放弃这个改动",
                 true,
                 None::<&str>,
             )?,
@@ -136,14 +133,14 @@ pub fn build_main(
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_squash",
-                "Squash into parent",
+                "合并到上一个改动",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_restore",
-                "Restore from parent",
+                "从上一个改动恢复",
                 true,
                 None::<&str>,
             )?,
@@ -151,7 +148,7 @@ pub fn build_main(
             &MenuItem::with_id(
                 app_handle,
                 "menu_revision_bookmark",
-                "Create bookmark...",
+                "新建分支...",
                 true,
                 None::<&str>,
             )?,
@@ -245,14 +242,14 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "revision_new_child",
-                "New child",
+                "新建子改动",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "revision_new_parent",
-                "New inserted parent",
+                "在上一个改动之前插入",
                 true,
                 None::<&str>,
             )?,
@@ -260,28 +257,28 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "revision_edit",
-                "Edit as working copy",
+                "编辑这个改动",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "revision_revert",
-                "Revert into working copy",
+                "把改动内容恢复到工作副本",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "revision_duplicate",
-                "Duplicate",
+                "复制一份",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "revision_abandon",
-                "Abandon",
+                "放弃这个改动",
                 true,
                 None::<&str>,
             )?,
@@ -289,14 +286,14 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "revision_squash",
-                "Squash into parent",
+                "合并到上一个改动",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "revision_restore",
-                "Restore from parent",
+                "从上一个改动恢复",
                 true,
                 None::<&str>,
             )?,
@@ -304,7 +301,7 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "revision_bookmark",
-                "Create bookmark...",
+                "新建分支...",
                 true,
                 None::<&str>,
             )?,
@@ -317,14 +314,14 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "tree_squash",
-                "Squash into parent",
+                "合并到上一个改动",
                 true,
                 None::<&str>,
             )?,
             &MenuItem::with_id(
                 app_handle,
                 "tree_restore",
-                "Restore from parent",
+                "从上一个改动恢复",
                 true,
                 None::<&str>,
             )?,
@@ -332,7 +329,7 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "tree_file_history",
-                "View file history",
+                "查看这个文件的历史",
                 true,
                 None::<&str>,
             )?,
@@ -342,34 +339,34 @@ pub fn build_context(
     let ref_menu = Menu::with_items(
         app_handle,
         &[
-            &MenuItem::with_id(app_handle, "bookmark_track", "Track", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app_handle,
+                "bookmark_track",
+                "开始跟踪远程分支",
+                true,
+                None::<&str>,
+            )?,
             &MenuItem::with_id(
                 app_handle,
                 "bookmark_untrack",
-                "Untrack",
+                "停止跟踪远程分支",
                 true,
                 None::<&str>,
             )?,
             &PredefinedMenuItem::separator(app_handle)?,
-            &MenuItem::with_id(app_handle, "bookmark_push_all", "Push", true, None::<&str>)?,
+            &MenuItem::with_id(app_handle, "bookmark_push_all", "上传", true, None::<&str>)?,
             &MenuItem::with_id(
                 app_handle,
                 "bookmark_push_single",
-                "Push to remote...",
+                "上传到指定远程...",
                 true,
                 None::<&str>,
             )?,
-            &MenuItem::with_id(
-                app_handle,
-                "bookmark_fetch_all",
-                "Fetch",
-                true,
-                None::<&str>,
-            )?,
+            &MenuItem::with_id(app_handle, "bookmark_fetch_all", "下载", true, None::<&str>)?,
             &MenuItem::with_id(
                 app_handle,
                 "bookmark_fetch_single",
-                "Fetch from remote...",
+                "从指定远程下载...",
                 true,
                 None::<&str>,
             )?,
@@ -377,23 +374,29 @@ pub fn build_context(
             &MenuItem::with_id(
                 app_handle,
                 "bookmark_rename",
-                "Rename...",
+                "重命名...",
                 true,
                 None::<&str>,
             )?,
-            &MenuItem::with_id(app_handle, "bookmark_delete", "Delete", true, None::<&str>)?,
+            &MenuItem::with_id(app_handle, "bookmark_delete", "删除", true, None::<&str>)?,
         ],
     )?;
 
     let workspace_menu = Menu::with_items(
         app_handle,
         &[
-            &MenuItem::with_id(app_handle, "workspace_open", "Open", true, None::<&str>)?,
-            &MenuItem::with_id(app_handle, "workspace_forget", "Forget", true, None::<&str>)?,
+            &MenuItem::with_id(app_handle, "workspace_open", "打开", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app_handle,
+                "workspace_forget",
+                "从列表中移除",
+                true,
+                None::<&str>,
+            )?,
             &MenuItem::with_id(
                 app_handle,
                 "workspace_rename",
-                "Rename...",
+                "重命名...",
                 true,
                 None::<&str>,
             )?,

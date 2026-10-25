@@ -18,7 +18,7 @@ use super::{
 };
 
 use crate::{
-    config::{GGSettings, read_config},
+    config::{GGSettings, read_config_with_env},
     messages,
 };
 
@@ -84,6 +84,10 @@ pub enum SessionEvent {
     QueryRemotes {
         tx: Sender<Result<Vec<String>>>,
         tracking_bookmark: Option<String>,
+    },
+    /// List all branches in the repo, local and remote.
+    QueryBranches {
+        tx: Sender<Result<Vec<messages::queries::BranchInfo>>>,
     },
     /// Start a new log query with the given revset string.
     QueryLog {
@@ -286,6 +290,7 @@ impl Session for WorkspaceSession<'_> {
                     tx,
                     tracking_bookmark,
                 } => tx.send(queries::query_remotes(&self, tracking_bookmark))?,
+                SessionEvent::QueryBranches { tx } => tx.send(queries::query_branches(&self))?,
                 SessionEvent::QueryLog {
                     tx,
                     query: revset_string,
@@ -413,12 +418,14 @@ impl Session for WorkspaceSession<'_> {
                         log::warn!("Failed to write config array: {err:#}");
                     }
 
+                    // the read shares the environment that wrote the file, so
+                    // jj looks in the same per-repository config directory
                     (
                         self.data.workspace_settings,
                         self.data.aliases_map,
                         self.data.fileset_aliases_map,
                         self.data.query_choices,
-                    ) = read_config(Some(self.workspace.repo_path()))?;
+                    ) = read_config_with_env(&mut config_env, Some(self.workspace.repo_path()))?;
                 }
                 SessionEvent::WriteConfigTable { scope, key, values } => {
                     let name: ConfigNamePathBuf = key.iter().collect();
@@ -453,12 +460,14 @@ impl Session for WorkspaceSession<'_> {
                         log::warn!("Failed to write config table: {err:#}");
                     }
 
+                    // the read shares the environment that wrote the file, so
+                    // jj looks in the same per-repository config directory
                     (
                         self.data.workspace_settings,
                         self.data.aliases_map,
                         self.data.fileset_aliases_map,
                         self.data.query_choices,
-                    ) = read_config(Some(self.workspace.repo_path()))?;
+                    ) = read_config_with_env(&mut config_env, Some(self.workspace.repo_path()))?;
                 }
             };
         }
@@ -480,6 +489,9 @@ impl Session for QuerySession<'_, '_> {
                     tx,
                     tracking_bookmark,
                 }) => tx.send(queries::query_remotes(self.ws, tracking_bookmark))?,
+                Ok(SessionEvent::QueryBranches { tx }) => {
+                    tx.send(queries::query_branches(self.ws))?
+                }
                 Ok(SessionEvent::QueryLogNextPage { tx }) => tx.send(self.get_page())?,
                 Ok(unhandled) => return Ok(QueryResult(unhandled, self.state)),
                 Err(err) => return Err(anyhow!(err)),

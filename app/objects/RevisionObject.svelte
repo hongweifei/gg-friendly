@@ -7,6 +7,7 @@
     import Object from "./Object.svelte";
     import Zone from "./Zone.svelte";
     import RevisionMutator from "../mutators/RevisionMutator";
+    import { revisionTitle } from "../vocabulary";
     import TagObject from "./TagObject.svelte";
     import AuthorSpan from "../controls/AuthorSpan.svelte";
     import WorkspaceObject from "./WorkspaceObject.svelte";
@@ -64,7 +65,7 @@
                         $currentTarget.header.parent_ids.findIndex((id) => id.hex == header.id.commit.hex) != -1)} />
 
             <span class="text desc truncate" class:indescribable={!context && header.description.lines[0] == ""}>
-                {dragHint ?? (header.description.lines[0] == "" ? "(no description set)" : header.description.lines[0])}
+                {dragHint ?? revisionTitle(header)}
             </span>
 
             <span class="email"><AuthorSpan author={header.author} /></span>
@@ -96,9 +97,7 @@
                 <IdSpan id={header.id.change} pronoun={context || target || dropHint != null} />
 
                 <span class="text desc truncate" class:indescribable={!context && header.description.lines[0] == ""}>
-                    {dragHint ??
-                        dropHint ??
-                        (header.description.lines[0] == "" ? "(no description set)" : header.description.lines[0])}
+                    {dragHint ?? dropHint ?? revisionTitle(header)}
                 </span>
 
                 <span class="email"><AuthorSpan author={header.author} /></span>
@@ -158,7 +157,8 @@
     }
 
     .desc.indescribable {
-        color: var(--ctp-subtext0);
+        color: var(--ctp-subtext1);
+        font-style: italic;
     }
 
     .email {

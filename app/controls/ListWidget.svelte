@@ -34,6 +34,8 @@
     export let clientHeight = 0;
     export let clientWidth = 0;
     export let scrollTop = 0;
+    // how tall one row is, so the keyboard can scroll by the right distance
+    export let rowHeight = 30;
 
     let activedescendant = `${type}-${descendant}`;
     let box: HTMLElement;
@@ -144,7 +146,7 @@
                 event.preventDefault();
                 selection = list.getSelection();
                 minIdx = Math.min(selection.from, selection.to);
-                pageRows = Math.round(box.clientHeight / 30);
+                pageRows = Math.round(box.clientHeight / rowHeight);
                 minIdx = Math.max(minIdx - pageRows, 0);
                 onSelect(minIdx);
                 break;
@@ -153,7 +155,7 @@
                 event.preventDefault();
                 selection = list.getSelection();
                 maxIdx = Math.max(selection.from, selection.to);
-                pageRows = Math.round(box.clientHeight / 30);
+                pageRows = Math.round(box.clientHeight / rowHeight);
                 maxIdx = Math.min(maxIdx + pageRows, list.getSize() - 1);
                 onSelect(maxIdx);
                 break;
@@ -189,11 +191,11 @@
     }
 
     function scrollToRow(index: number) {
-        let y = index * 30;
-        if (box.scrollTop + box.clientHeight < y + 30) {
+        let y = index * rowHeight;
+        if (box.scrollTop + box.clientHeight < y + rowHeight) {
             box.scrollTo({
                 left: 0,
-                top: y - box.clientHeight + 30,
+                top: y - box.clientHeight + rowHeight,
                 behavior: "smooth",
             });
         } else if (box.scrollTop > y) {
@@ -217,7 +219,7 @@
 <ol
     class="listbox"
     role="listbox"
-    aria-label="{type} List"
+    aria-label="{type} 列表"
     aria-multiselectable="false"
     aria-activedescendant={activedescendant}
     tabindex="0"

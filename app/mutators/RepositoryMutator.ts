@@ -22,49 +22,49 @@ export default class RepositoryMutator {
 
     async #handleUrl() {
         let fields = [
-            { label: "Repository", choices: [] }
+            { label: "仓库地址", choices: [] }
         ];
 
-        let result = await getInput("Clone Repository", "", fields);
+        let result = await getInput("克隆仓库", "", fields);
         if (!result) return;
 
-        let url = result["Repository"].trim();
+        let url = result["仓库地址"].trim();
 
         trigger("forward_clone_url", { url });
     }
 
     async #handleClone(originalUrl: string, originalPath: string) {
         let fields = [
-            { label: "Repository", choices: [originalUrl] },
-            { label: "Destination", choices: [originalPath] },
-            { label: "Colocated", choices: ["false", "true"] },
+            { label: "仓库地址", choices: [originalUrl] },
+            { label: "保存到", choices: [originalPath] },
+            { label: "同时作为 Git 仓库", choices: ["false", "true"] },
         ];
 
-        let result = await getInput("Clone Repository", "", fields);
+        let result = await getInput("克隆仓库", "", fields);
         if (!result) return;
 
-        let url = result["Repository"].trim();
-        let path = result["Destination"].trim();
-        let colocated = result["Colocated"] === "true";
+        let url = result["仓库地址"].trim();
+        let path = result["保存到"].trim();
+        let colocated = result["同时作为 Git 仓库"] === "true";
 
         mutate<CloneRepository>("clone_repository", {
             url,
             path,
             colocated,
-        }, { operation: "Cloning..." });
+        }, { operation: "正在克隆仓库..." });
     }
 
     async #handleInit(originalPath: string, hasGit: boolean) {
         let fields = [
-            { label: "Destination", choices: [originalPath] },
-            { label: "Colocated", choices: hasGit ? ["true", "false"] : ["false", "true"] },
+            { label: "保存到", choices: [originalPath] },
+            { label: "同时作为 Git 仓库", choices: hasGit ? ["true", "false"] : ["false", "true"] },
         ];
 
-        let result = await getInput("Initialize Repository", "", fields);
+        let result = await getInput("初始化仓库", "", fields);
         if (!result) return;
 
-        let path = result["Destination"];
-        let colocated = result["Colocated"] === "true";
+        let path = result["保存到"];
+        let colocated = result["同时作为 Git 仓库"] === "true";
 
         mutate<InitRepository>("init_repository", {
             path,

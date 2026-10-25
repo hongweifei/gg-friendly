@@ -46,9 +46,9 @@ export default class WorkspaceMutator {
     };
 
     onRename = async () => {
-        let response = await getInput("Rename Workspace", "", ["Workspace Name"]);
+        let response = await getInput("重命名工作区", "", ["工作区名称"]);
         if (response) {
-            let new_name = response["Workspace Name"];
+            let new_name = response["工作区名称"];
             mutate<RenameWorkspace>("rename_workspace", {
                 name: this.#name,
                 new_name,

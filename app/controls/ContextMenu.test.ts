@@ -59,7 +59,7 @@ describe("ContextMenu (revert)", () => {
 
         let buttons = container.querySelectorAll("button");
         let revertButton = Array.from(buttons).find(
-            (b) => b.textContent === "Revert into working copy",
+            (b) => b.textContent?.trim() === "把改动内容恢复到工作副本",
         );
 
         expect(revertButton).toBeTruthy();
@@ -95,7 +95,7 @@ describe("ContextMenu (revert)", () => {
 
         let buttons = container.querySelectorAll("button");
         let revertButton = Array.from(buttons).find(
-            (b) => b.textContent === "Revert into working copy",
+            (b) => b.textContent?.trim() === "把改动内容恢复到工作副本",
         );
 
         expect(revertButton).toBeTruthy();
@@ -116,7 +116,7 @@ describe("ContextMenu (revert)", () => {
         });
 
         let buttons = container.querySelectorAll("button");
-        let bookmarkButton = Array.from(buttons).find((b) => b.textContent === "Create bookmark...");
+        let bookmarkButton = Array.from(buttons).find((b) => b.textContent?.trim() === "新建分支...");
 
         expect(bookmarkButton).toBeTruthy();
         expect(bookmarkButton!.disabled).toBe(false);
@@ -131,10 +131,10 @@ describe("ContextMenu (revert)", () => {
         });
 
         let request = get(currentInput)!;
-        expect(request.title).toBe("Create Bookmark");
-        expect(request.fields.map((f) => f.label)).toEqual(["Bookmark Name"]);
+        expect(request.title).toBe("新建分支");
+        expect(request.fields.map((f) => f.label)).toEqual(["分支名称"]);
 
-        request.callback({ fields: { "Bookmark Name": "my-bookmark" } });
+        request.callback({ fields: { "分支名称": "my-bookmark" } });
 
         await vi.waitFor(() => {
             expect(mutationCalls).toHaveLength(1);
@@ -160,7 +160,7 @@ describe("ContextMenu (revert)", () => {
         });
 
         let buttons = container.querySelectorAll("button");
-        let bookmarkButton = Array.from(buttons).find((b) => b.textContent === "Create bookmark...");
+        let bookmarkButton = Array.from(buttons).find((b) => b.textContent?.trim() === "新建分支...");
 
         bookmarkButton!.click();
 
@@ -194,7 +194,7 @@ describe("ContextMenu (revert)", () => {
         });
 
         let buttons = container.querySelectorAll("button");
-        let bookmarkButton = Array.from(buttons).find((b) => b.textContent === "Create bookmark...");
+        let bookmarkButton = Array.from(buttons).find((b) => b.textContent?.trim() === "新建分支...");
 
         expect(bookmarkButton).toBeTruthy();
         expect(bookmarkButton!.disabled).toBe(true);
@@ -221,7 +221,7 @@ describe("ContextMenu (revert)", () => {
 
         let buttons = container.querySelectorAll("button");
         let revertButton = Array.from(buttons).find(
-            (b) => b.textContent === "Revert into working copy",
+            (b) => b.textContent?.trim() === "把改动内容恢复到工作副本",
         );
 
         expect(revertButton).toBeTruthy();
@@ -257,7 +257,7 @@ describe("ContextMenu (file history)", () => {
         });
 
         let buttons = container.querySelectorAll("button");
-        let historyButton = Array.from(buttons).find((b) => b.textContent === "View file history");
+        let historyButton = Array.from(buttons).find((b) => b.textContent?.trim() === "查看这个文件的历史");
 
         expect(historyButton).toBeTruthy();
         expect(historyButton!.disabled).toBe(false);
@@ -287,7 +287,7 @@ describe("ContextMenu (file history)", () => {
 
         let buttons = container.querySelectorAll("button");
         Array.from(buttons)
-            .find((b) => b.textContent === "View file history")!
+            .find((b) => b.textContent?.trim() === "查看这个文件的历史")!
             .click();
 
         expect(get(logQueryRequest)).toBe('files("a \\"quoted\\" \\\\ name.txt")');

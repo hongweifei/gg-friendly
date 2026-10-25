@@ -20,11 +20,11 @@
 </script>
 
 {#if workspaces.length > 0}
-    <h3>Recent Workspaces</h3>
+    <h3>最近打开的仓库</h3>
     <ul>
         {#each workspaces as workspace}
             <li>
-                <button on:click={() => openWorkspace(workspace)} title="open this workspace">
+                <button on:click={() => openWorkspace(workspace)} title="打开这个仓库">
                     {workspace}
                 </button>
             </li>

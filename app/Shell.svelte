@@ -9,6 +9,7 @@
         currentContext,
         repoConfigEvent,
         repoStatusEvent,
+        repoChanges,
         revisionSelectEvent,
         selectionHeaders,
         currentInput,
@@ -31,6 +32,7 @@
     import ProgressDialog from "./shell/ProgressDialog.svelte";
     import RecentWorkspaces from "./shell/RecentWorkspaces.svelte";
     import { onMount, setContext } from "svelte";
+    import { themeChoice } from "./stores.js";
     import InputDialog from "./shell/InputDialog.svelte";
     import type Settings from "./shell/Settings";
     import type { RepoEvent } from "./messages/RepoEvent";
@@ -40,8 +42,13 @@
         default: {
             workspace: Extract<RepoConfig, { type: "Workspace" }>;
             selection: Query<RevsResult>;
+            selectedBranchNames: Set<string>;
         };
+        banner: {};
     }
+
+    /** the branches the selected change is on, for the branch list */
+    let selectedBranchNames: Set<string> = new Set();
 
     export let revsetOverride: string | null = null;
 
@@ -66,7 +73,10 @@
         });
     }
 
-    document.body.addEventListener("click", () => currentContext.set(null), true);
+    // The context is cleared when a click lands outside the context menu.
+    // The listener runs in the bubble phase, so a click on a menu entry
+    // reaches the entry's own handler first.
+    document.body.addEventListener("click", () => currentContext.set(null));
 
     async function initialize() {
         const result = await query<RepoConfig>("query_workspace", null);
@@ -186,6 +196,7 @@
 
     async function loadChange(set: RevSet) {
         let rev = await query<RevsResult>("query_revisions", { set }, (q) => (selection = q));
+        selectedBranchNames = new Set();
 
         // if empty, fall back to working copy
         if (
@@ -211,6 +222,16 @@
         selection = rev;
         if (rev.type == "data" && rev.value.type == "Detail") {
             $selectionHeaders = rev.value.headers;
+
+            let names = new Set<string>();
+            for (let header of rev.value.headers) {
+                for (let ref of header.refs) {
+                    if (ref.type == "LocalBookmark") {
+                        names.add(ref.bookmark_name);
+                    }
+                }
+            }
+            selectedBranchNames = names;
         }
     }
 
@@ -219,9 +240,12 @@
             return;
         }
         if ($repoConfigEvent.type === "Workspace") {
-            const result = await query<RepoStatus | null>("query_snapshot", null);
+            let result = await query<RepoStatus | null>("query_snapshot", null);
             if (result.type === "data" && result.value) {
                 repoStatusEvent.set(result.value);
+                // Taking the snapshot can pick up file changes made outside the
+                // app, so the lists have to be read again.
+                repoChanges.update((n) => n + 1);
             }
         }
         lastFocus.set(Date.now());
@@ -270,46 +294,76 @@
     function mutateRepository(event: RepoEvent) {
         new RepositoryMutator().handle(event);
     }
+
+    // the user's pick wins; without one the repository's setting applies,
+    // and with neither the system setting is followed
+    $: shellTheme = (() => {
+        if ($themeChoice != "system") {
+            return $themeChoice;
+        }
+        let override = $repoConfigEvent?.type == "Workspace" ? $repoConfigEvent.theme_override : null;
+        return override ?? "";
+    })();
+
+    // remember the pick across restarts
+    onMount(() => {
+        let saved = localStorage.getItem("gg.theme");
+        if (saved == "light" || saved == "dark" || saved == "system") {
+            themeChoice.set(saved);
+        }
+
+        const unsubscribe = themeChoice.subscribe((choice) => {
+            localStorage.setItem("gg.theme", choice);
+        });
+        return unsubscribe;
+    });
 </script>
 
 <Zone operand={{ type: "Repository" }} alwaysTarget let:target>
-    <div id="shell" class={$repoConfigEvent?.type == "Workspace" ? $repoConfigEvent.theme_override : ""}>
+    <div id="shell" class={shellTheme}>
         {#if $repoConfigEvent.type == "Initial"}
-            <TitlebarInset>
-                <Pane>
-                    <h2 slot="header">Loading...</h2>
-                </Pane>
-            </TitlebarInset>
+            <div class="content">
+                <TitlebarInset>
+                    <Pane>
+                        <h2 slot="header">正在加载...</h2>
+                    </Pane>
+                </TitlebarInset>
+            </div>
         {:else if $repoConfigEvent.type == "Workspace"}
-            <slot workspace={$repoConfigEvent} {selection} />
+            <div class="banner">
+                <slot name="banner" />
+            </div>
+            <div class="content">
+                <slot workspace={$repoConfigEvent} {selection} {selectedBranchNames} />
+            </div>
         {:else if $repoConfigEvent.type == "LoadError"}
             <ModalOverlay>
-                <ErrorDialog title="No Workspace Loaded">
+                <ErrorDialog title="没有打开仓库">
                     <p style="grid-column: 1/3">
-                        You can run <code>gg</code> in a Jujutsu workspace or open one from the Repository menu.
+                        请在 Jujutsu 仓库目录里运行 <code>gg</code>，或者从「仓库」菜单里打开一个。
                     </p>
                     <RecentWorkspaces workspaces={recentWorkspaces} />
                 </ErrorDialog>
             </ModalOverlay>
         {:else if $repoConfigEvent.type == "TimeoutError"}
             <ModalOverlay>
-                <ErrorDialog title="No Workspace Loaded" severe>
-                    <p>Error communicating with backend: the operation is taking too long.</p>
-                    <p>You may need to restart GG to continue.</p>
+                <ErrorDialog title="没有打开仓库" severe>
+                    <p>和后台的连接超时了，这次操作花的时间太长。</p>
+                    <p>你可能需要重启 gg-friendly 才能继续。</p>
                     <RecentWorkspaces workspaces={recentWorkspaces} />
                 </ErrorDialog>
             </ModalOverlay>
         {:else}
             <ModalOverlay>
-                <ErrorDialog title="Fatal Error" severe>
-                    <p>Error communicating with backend: {$repoConfigEvent.message}.</p>
-                    <p>You may need to restart GG to continue.</p>
+                <ErrorDialog title="出错了" severe>
+                    <p>和后台的连接断了：{$repoConfigEvent.message}</p>
+                    <p>你可能需要重启 gg-friendly 才能继续。</p>
                     <RecentWorkspaces workspaces={recentWorkspaces} />
                 </ErrorDialog>
             </ModalOverlay>
         {/if}
 
-        <div class="separator" style="grid-row: 2"></div>
+        <div class="separator" style="grid-row: 3"></div>
 
         <StatusBar {target} />
 
@@ -326,7 +380,7 @@
                 {#if $currentMutation.type == "wait" && $progressEvent !== undefined}
                     <ProgressDialog progress={$progressEvent} />
                 {:else if $currentMutation.type == "data" && ($currentMutation.value.type == "InternalError" || $currentMutation.value.type == "PreconditionError")}
-                    <ErrorDialog title="Command Error" onClose={() => ($currentMutation = null)} severe>
+                    <ErrorDialog title="操作没能完成" onClose={() => ($currentMutation = null)} severe>
                         {#if $currentMutation.value.type == "InternalError"}
                             <p>
                                 {#each $currentMutation.value.message.lines as line}
@@ -338,7 +392,7 @@
                         {/if}
                     </ErrorDialog>
                 {:else if $currentMutation.type == "error"}
-                    <ErrorDialog title="IPC Error" onClose={() => ($currentMutation = null)} severe>
+                    <ErrorDialog title="连接出错" onClose={() => ($currentMutation = null)} severe>
                         <p>{$currentMutation.message}</p>
                     </ErrorDialog>
                 {/if}
@@ -365,8 +419,9 @@
 
         display: grid;
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr 3px 30px;
+        grid-template-rows: auto 1fr 3px 30px;
         grid-template-areas:
+            "banner"
             "content"
             "."
             "footer";
@@ -375,6 +430,18 @@
         color: var(--ctp-text);
 
         user-select: none;
+    }
+
+    /* the banner slot is absent until a workspace opens, so the content
+       takes the top row when there's no banner to sit above it */
+    .banner {
+        grid-area: banner;
+    }
+
+    .content {
+        grid-area: content;
+        overflow: hidden;
+        min-height: 0;
     }
 
     .separator {

@@ -19,16 +19,18 @@
 <style>
     .id {
         pointer-events: none;
-        color: var(--ctp-subtext0);
+        color: var(--ctp-subtext1);
         font-family: var(--stack-code);
     }
 
+    /* change ids and commit ids get their own colour so the two can be
+       told apart at a glance */
     .commit {
-        color: var(--ctp-mauve);
+        color: var(--id-commit);
     }
 
     .change {
-        color: var(--ctp-pink);
+        color: var(--id-change);
     }
 
     .hidden {
@@ -36,7 +38,7 @@
     }
 
     .divergent {
-        color: var(--ctp-red);
+        color: var(--id-divergent);
     }
 
     .pronoun {

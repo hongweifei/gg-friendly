@@ -147,11 +147,11 @@ export default class RevisionMutator {
 
     onBookmark = async () => {
         if (!this.#singleton) return;
-        let response = await getInput("Create Bookmark", "", ["Bookmark Name"]);
+        let response = await getInput("新建分支", "", ["分支名称"]);
         if (response) {
             let ref: StoreRef = {
                 type: "LocalBookmark",
-                bookmark_name: response["Bookmark Name"],
+                bookmark_name: response["分支名称"],
                 has_conflict: false,
                 is_synced: false,
                 potential_remotes: 0,
