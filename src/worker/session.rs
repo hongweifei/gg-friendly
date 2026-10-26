@@ -547,7 +547,8 @@ async fn handle_query(
         }
     };
 
-    let mut query = queries::QuerySession::new(ws, &*revset, query_state);
+    let prioritized = queries::prioritized_commits(ws, &*revset)?;
+    let mut query = queries::QuerySession::new(ws, &*revset, query_state, &prioritized);
     let page = query.get_page();
     tx.send(page)?;
 

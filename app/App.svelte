@@ -9,6 +9,7 @@
     import SetSpan from "./controls/SetSpan.svelte";
     import TopBar from "./shell/TopBar.svelte";
     import BranchPane from "./shell/BranchPane.svelte";
+    import PendingPane from "./shell/PendingPane.svelte";
     import type { BranchInfo } from "./messages/BranchInfo";
     import type { RepoStatus } from "./messages/RepoStatus";
     import { branchFilter, ignoreToggled, logQueryRequest, repoChanges, repoStatusEvent, revisionSelectEvent } from "./stores.js";
@@ -232,25 +233,31 @@
 
                 <div class="divider" role="separator" aria-orientation="horizontal"></div>
 
-                <BoundQuery query={selection} let:data>
-                    {#if data.type == "Detail"}
-                        <RevisionPane revs={data} />
-                    {:else}
-                        <Pane titlebar>
-                            <h2 slot="header">没有找到</h2>
-                            <p slot="body">
-                                空的改动集合 <SetSpan set={data.set} />。
-                            </p>
+                <div class="detail">
+                    <PendingPane />
+
+                    <div class="divider" role="separator" aria-orientation="horizontal"></div>
+
+                    <BoundQuery query={selection} let:data>
+                        {#if data.type == "Detail"}
+                            <RevisionPane revs={data} />
+                        {:else}
+                            <Pane titlebar>
+                                <h2 slot="header">没有找到</h2>
+                                <p slot="body">
+                                    空的改动集合 <SetSpan set={data.set} />。
+                                </p>
+                            </Pane>
+                        {/if}
+                        <Pane titlebar slot="error" let:message>
+                            <h2 slot="header">出错了</h2>
+                            <p slot="body">{message}</p>
                         </Pane>
-                    {/if}
-                    <Pane titlebar slot="error" let:message>
-                        <h2 slot="header">出错了</h2>
-                        <p slot="body">{message}</p>
-                    </Pane>
-                    <Pane titlebar slot="wait">
-                        <h2 slot="header">正在加载...</h2>
-                    </Pane>
-                </BoundQuery>
+                        <Pane titlebar slot="wait">
+                            <h2 slot="header">正在加载...</h2>
+                        </Pane>
+                    </BoundQuery>
+                </div>
             </div>
         </div>
     {/if}
@@ -271,6 +278,15 @@
         grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1.6fr);
         overflow: hidden;
         min-width: 0;
+    }
+
+    .detail {
+        display: grid;
+        /* the pending files take a slice of the height, the selected change's
+           details get the rest */
+        grid-template-rows: minmax(0, 0.7fr) 1px minmax(0, 1.6fr);
+        overflow: hidden;
+        min-height: 0;
     }
 
     .divider {

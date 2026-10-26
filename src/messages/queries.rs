@@ -126,4 +126,10 @@ pub struct BranchInfo {
     pub is_absent: bool,
     /// Whether the branch points at more than one commit.
     pub has_conflict: bool,
+    /// How many commits the local branch has that the tracked remote doesn't.
+    /// Only for local branches that track a remote.
+    pub ahead: Option<usize>,
+    /// How many commits the tracked remote has that the local branch doesn't.
+    /// Only for local branches that track a remote.
+    pub behind: Option<usize>,
 }

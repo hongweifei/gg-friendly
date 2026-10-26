@@ -38,6 +38,25 @@ repository stands, so it leads with the branch being worked on.
     function isLocalOnly(branch: BranchInfo): boolean {
         return branch.is_local && !branch.is_tracking;
     }
+
+    /**
+     * How far the branch and the remote it tracks have drifted apart, as
+     * "↑2 ↓1". Nothing to say when the two are the same, or when the branch
+     * has no remote to compare against.
+     */
+    function driftLabel(branch: BranchInfo): string {
+        if (!branch.is_local || !branch.is_tracking) {
+            return "";
+        }
+        let parts: string[] = [];
+        if (branch.ahead) {
+            parts.push(`↑${branch.ahead}`);
+        }
+        if (branch.behind) {
+            parts.push(`↓${branch.behind}`);
+        }
+        return parts.join(" ");
+    }
 </script>
 
 <aside class="branches">
@@ -67,7 +86,14 @@ repository stands, so it leads with the branch being worked on.
                     class="dot"
                     class:ahead={isAhead(branch)}
                     class:conflict={branch.has_conflict}></span>
-                <span class="name">{branch.name}</span>
+                <span class="label">
+                    <span class="name">{branch.name}</span>
+                    {#if driftLabel(branch)}
+                        <span class="drift" title="领先远程 {branch.ahead} 个改动，落后 {branch.behind} 个改动">
+                            {driftLabel(branch)}
+                        </span>
+                    {/if}
+                </span>
                 {#if isAhead(branch)}
                     <span class="mark ahead">未上传</span>
                 {:else if isSynced(branch)}
@@ -188,6 +214,22 @@ repository stands, so it leads with the branch being worked on.
         font-size: 13.5px;
         text-align: left;
         cursor: pointer;
+    }
+
+    /* the branch name, with the drift count next to it */
+    .label {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .drift {
+        flex: none;
+        font-size: 11px;
+        color: var(--ctp-subtext1);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
     }
 
     .branch:hover {

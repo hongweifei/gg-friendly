@@ -304,15 +304,35 @@ fn set_in_doc(doc: &mut toml_edit::DocumentMut, path: &str, item: &toml_edit::It
     table.insert(leaf[0], item.clone());
 }
 
+/// The revset the change list starts with.
+///
+/// jj's own default, `builtin_log()`, walks into every conflict chain the
+/// repository has ever had, so the list opens on a wall of abandoned
+/// changes. `all()` shows the same history; the branch tips are put first
+/// when the list is drawn, so the branches people work on are at the top.
+///
+/// A user who redefined `builtin_log()` gets their own definition.
 pub fn read_log_revset(settings: &UserSettings, aliases_map: &RevsetAliasesMap) -> String {
     let log_revset = settings.get_string("revsets.log").unwrap_or_default();
     if log_revset.trim() == "builtin_log()"
         && let Some((_, _, definition, _)) = aliases_map.get_function("builtin_log", 0)
     {
+        // jj's own definition walks into every conflict chain, so the list
+        // opens on a wall of abandoned changes. `all()` shows the same
+        // history; the branch tips are put first when the list is drawn, so
+        // the branches people work on are at the top. A user who redefined
+        // the alias gets their own definition.
+        if definition == JJ_BUILTIN_LOG {
+            return "all()".to_owned();
+        }
         return definition.clone();
     }
     log_revset
 }
+
+/// jj's own definition of `builtin_log()`. The default is replaced only when
+/// the user has not redefined it.
+const JJ_BUILTIN_LOG: &str = "present(@) | ancestors(immutable_heads().., 2) | trunk()";
 
 fn read_preset_choices(stacked_config: &StackedConfig) -> HashMap<String, String> {
     let table_name = ConfigNamePathBuf::from_iter(["gg", "presets"]);

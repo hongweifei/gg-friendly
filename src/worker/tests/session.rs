@@ -2,7 +2,7 @@ use super::{XDG_ENV_LOCK, mkid, mkrepo, revs};
 use crate::{
     messages::{
         RepoConfig, RepoStatus, RevSet,
-        queries::{LogPage, RevsResult},
+        queries::{BranchInfo, LogPage, RevsResult},
     },
     worker::{Session, SessionEvent, WorkerSession},
 };
@@ -503,6 +503,50 @@ async fn config_write_table() -> Result<()> {
         assert_eq!(query_choices.get("my-preset").map(|s| s.as_str()), Some("trunk().."));
         assert_eq!(query_choices.get("wip").map(|s| s.as_str()), Some("description(exact:\"\")"));
     });
+
+    Ok(())
+}
+
+#[tokio::test]
+#[allow(clippy::await_holding_lock)]
+async fn query_branches_reports_how_far_a_branch_has_drifted() -> Result<()> {
+    let _lock = XDG_ENV_LOCK.lock().unwrap();
+    let repo = mkrepo();
+
+    let (tx, rx) = channel::<SessionEvent>();
+    let (tx_load, rx_load) = channel::<Result<RepoConfig>>();
+    let (tx_branches, rx_branches) = channel::<Result<Vec<BranchInfo>>>();
+
+    tx.send(SessionEvent::OpenWorkspace {
+        tx: tx_load,
+        wd: Some(repo.path().to_owned()),
+    })?;
+    tx.send(SessionEvent::QueryBranches { tx: tx_branches })?;
+    tx.send(SessionEvent::EndSession)?;
+
+    WorkerSession::default().handle_events(&rx).await?;
+
+    _ = rx_load.recv()??;
+    let branches = rx_branches.recv()??;
+
+    // the test repository's `main` sits one commit on top of the remote it
+    // tracks, so it is one ahead of it
+    let main = branches
+        .iter()
+        .find(|b| b.is_local && b.name == "main")
+        .expect("main should be listed");
+    assert!(main.is_tracking);
+    assert_eq!(main.ahead, Some(1));
+    assert_eq!(main.behind, Some(0));
+
+    // a branch with no remote to compare against has nothing to say
+    let local_only = branches
+        .iter()
+        .find(|b| b.is_local && b.name == "conflicted-merge")
+        .expect("conflicted-merge should be listed");
+    assert!(!local_only.is_tracking);
+    assert_eq!(local_only.ahead, None);
+    assert_eq!(local_only.behind, None);
 
     Ok(())
 }

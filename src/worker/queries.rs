@@ -27,7 +27,7 @@ use jj_lib::{
     ref_name::{RefNameBuf, RemoteNameBuf, RemoteRefSymbol},
     repo::Repo,
     repo_path::RepoPath,
-    revset::{Revset, RevsetContainingFn, RevsetEvaluationError},
+    revset::{self, Revset, RevsetContainingFn, RevsetEvaluationError, RevsetStreamExt},
     rewrite,
     tree_merge::MergeOptions,
 };
@@ -90,10 +90,16 @@ impl<'q, 'w> QuerySession<'q, 'w> {
         ws: &'q WorkspaceSession<'w>,
         revset: &'q dyn Revset,
         state: QueryState,
+        prioritized: &[CommitId],
     ) -> QuerySession<'q, 'w> {
         let as_id: for<'a> fn(&'a CommitId) -> &'a CommitId = commit_id_identity;
-        let mut stream: Pin<Box<dyn Stream<Item = _> + 'q>> =
-            Box::pin(TopoGroupedGraph::new(revset.stream_graph(), as_id).stream());
+        let mut graph = TopoGroupedGraph::new(revset.stream_graph(), as_id);
+        // the branches people work on come first, so the history they care
+        // about is not pushed off the screen by a chain of conflicts
+        for id in prioritized {
+            graph.prioritize_branch(id.clone());
+        }
+        let mut stream: Pin<Box<dyn Stream<Item = _> + 'q>> = Box::pin(graph.stream());
         // skip already-yielded rows
         let mut stream_done = false;
         for _ in 0..state.next_row {
@@ -332,8 +338,39 @@ impl<'q, 'w> QuerySession<'q, 'w> {
 pub fn query_log(ws: &WorkspaceSession, revset_str: &str, max_results: usize) -> Result<LogPage> {
     let state = QueryState::new(max_results);
     let revset = ws.evaluate_revset_str(revset_str)?;
-    let mut session = QuerySession::new(ws, &*revset, state);
+    let prioritized = prioritized_commits(ws, &*revset)?;
+    let mut session = QuerySession::new(ws, &*revset, state, &prioritized);
     session.get_page()
+}
+
+/// The changes to show first: the working copy.
+///
+/// jj's own default walks into every conflict chain, so a repository that
+/// once had a conflict shows that chain first. Putting the working copy
+/// first is what jj itself does (`revsets.log-graph-prioritize`), and it
+/// keeps the branch people are working on at the top of the list.
+///
+/// Only changes the query actually returns are picked, because the graph
+/// needs every prioritised change to be part of the result.
+pub fn prioritized_commits(ws: &WorkspaceSession, revset: &dyn Revset) -> Result<Vec<CommitId>> {
+    let mut candidates = Vec::new();
+
+    if let Some(wc) = ws.repo().view().get_wc_commit_id(ws.name()) {
+        candidates.push(wc.clone());
+    }
+
+    // keep only the ones the query returns
+    let store = ws.repo().store();
+    let mut stream = revset.stream().commits(store);
+    let mut in_result = std::collections::HashSet::new();
+    while let Some(commit) = stream.next().block_on() {
+        in_result.insert(commit?.id().clone());
+    }
+
+    Ok(candidates
+        .into_iter()
+        .filter(|id| in_result.contains(id))
+        .collect())
 }
 
 #[cfg(test)]
@@ -377,11 +414,12 @@ pub async fn query_revisions(ws: &WorkspaceSession<'_>, set: RevSet) -> Result<R
         if let Ok(entry) = entry
             && !entry.is_resolved()
         {
+            let conflict_labels = readable_labels(final_tree.labels());
             match conflicts::materialize_tree_value(
                 ws.repo().store(),
                 &path,
                 entry,
-                final_tree.labels(),
+                &conflict_labels,
             )
             .await?
             {
@@ -500,6 +538,20 @@ pub fn query_branches(ws: &WorkspaceSession) -> Result<Vec<BranchInfo>> {
                     || remote_ref.target == *local_target
             });
 
+            // how far the local branch and the remote it tracks have drifted
+            // apart, counted against the remote it actually tracks
+            let tracked_remote = remote_refs.iter().find(|&&(remote_name, remote_ref)| {
+                remote_name != REMOTE_NAME_FOR_LOCAL_GIT_REPO && remote_ref.is_tracked()
+            });
+            let (ahead, behind) = match tracked_remote {
+                Some(&(_, remote_ref)) => count_ahead_behind(
+                    ws,
+                    local_target.present_adds().cloned().collect_vec(),
+                    remote_ref.target.present_adds().cloned().collect_vec(),
+                ),
+                None => (None, None),
+            };
+
             result.push(BranchInfo {
                 name: bookmark_name.as_str().to_owned(),
                 is_local: true,
@@ -511,6 +563,8 @@ pub fn query_branches(ws: &WorkspaceSession) -> Result<Vec<BranchInfo>> {
                 is_synced,
                 is_absent: false,
                 has_conflict: !local_target.is_resolved(),
+                ahead,
+                behind,
             });
         }
 
@@ -527,11 +581,89 @@ pub fn query_branches(ws: &WorkspaceSession) -> Result<Vec<BranchInfo>> {
                 is_synced: remote_ref.target == *local_target,
                 is_absent: remote_ref.is_absent(),
                 has_conflict: !remote_ref.target.is_resolved(),
+                ahead: None,
+                behind: None,
             });
         }
     }
 
     Ok(result)
+}
+
+/// How many commits the local branch has that the tracked remote doesn't, and
+/// the other way round.
+///
+/// The two ends of a branch rarely share a history. The range from one end
+/// up to the other, without the ancestors that end already has, is what the
+/// other end adds. jj counts it the same way, so the numbers here match what
+/// jj itself reports.
+fn count_ahead_behind(
+    ws: &WorkspaceSession,
+    local_ids: Vec<CommitId>,
+    remote_ids: Vec<CommitId>,
+) -> (Option<usize>, Option<usize>) {
+    if local_ids.is_empty() || remote_ids.is_empty() {
+        return (None, None);
+    }
+
+    let repo = ws.repo();
+    // the range from the remote up to the local branch, without the ancestors
+    // the remote already has: what the local branch adds
+    let ahead = revset::walk_revs(repo, &local_ids, &remote_ids)
+        .and_then(|revs| revs.count_estimate())
+        .ok()
+        .map(|(count, _)| count);
+    // and the other way round for what the remote has that the local lacks
+    let behind = revset::walk_revs(repo, &remote_ids, &local_ids)
+        .and_then(|revs| revs.count_estimate())
+        .ok()
+        .map(|(count, _)| count);
+
+    (ahead, behind)
+}
+
+/// The label a conflict term carries, in words someone can act on.
+///
+/// jj writes the raw commit ids and the role the term plays, like
+/// `tqnnuvwv 983d5949 "change a.txt" (rebase destination)`. The role and the
+/// description are worth keeping; the ids are noise for someone who only
+/// wants to know which side of the conflict to keep.
+fn readable_label(label: &str) -> String {
+    // the description, in quotes
+    let description = label
+        .split_once('"')
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(text, _)| text.trim())
+        .filter(|text| !text.is_empty());
+
+    // the role the term plays in the rebase
+    let role = if label.contains("(rebase destination)") {
+        Some("来自新的基线")
+    } else if label.contains("(parents of rebased revision)") {
+        Some("来自原来的上一个改动")
+    } else if label.contains("(rebased revision)") {
+        Some("来自这个改动本身")
+    } else {
+        None
+    };
+
+    match (role, description) {
+        (Some(role), Some(text)) => format!("{role}（{text}）"),
+        (Some(role), None) => role.to_owned(),
+        (None, Some(text)) => text.to_owned(),
+        (None, None) => label.to_owned(),
+    }
+}
+
+/// The conflict labels of a merge, rewritten so a reader can tell the sides
+/// apart without knowing jj's vocabulary.
+fn readable_labels(labels: &ConflictLabels) -> ConflictLabels {
+    let rewritten: Vec<String> = labels
+        .as_slice()
+        .iter()
+        .map(|label| readable_label(label))
+        .collect();
+    ConflictLabels::from_vec(rewritten)
 }
 
 /// The commit a ref points at, if it points at exactly one.
@@ -568,10 +700,12 @@ async fn format_tree_changes(
 
         let has_conflict = !after.is_resolved();
 
+        let before_labels = readable_labels(conflict_labels.before);
+        let after_labels = readable_labels(conflict_labels.after);
         let before_future =
-            conflicts::materialize_tree_value(store, &path, before.clone(), conflict_labels.before);
+            conflicts::materialize_tree_value(store, &path, before.clone(), &before_labels);
         let after_future =
-            conflicts::materialize_tree_value(store, &path, after.clone(), conflict_labels.after);
+            conflicts::materialize_tree_value(store, &path, after.clone(), &after_labels);
         let (before_value, after_value) = try_join!(before_future, after_future)?;
 
         let hunks = get_value_hunks(3, &path, before_value, after_value).await?;
@@ -911,4 +1045,47 @@ fn diff_by_line<'input, T: AsRef<[u8]> + ?Sized + 'input>(
 
 fn commit_id_identity(commit_id: &CommitId) -> &CommitId {
     commit_id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::readable_label;
+
+    #[test]
+    fn conflict_labels_are_rewritten_into_words() {
+        assert_eq!(
+            readable_label("tqnnuvwv 983d5949 \"change a.txt\" (rebase destination)"),
+            "来自新的基线（change a.txt）"
+        );
+        assert_eq!(
+            readable_label("nxxylmpu fa32b17f \"change both\" (parents of rebased revision)"),
+            "来自原来的上一个改动（change both）"
+        );
+        assert_eq!(
+            readable_label("ywknyuol f86298e8 \"create c.txt\" (rebased revision)"),
+            "来自这个改动本身（create c.txt）"
+        );
+    }
+
+    #[test]
+    fn a_label_without_a_description_still_names_the_side() {
+        assert_eq!(
+            readable_label("tqnnuvwv 983d5949 (rebase destination)"),
+            "来自新的基线"
+        );
+    }
+
+    #[test]
+    fn an_unrecognised_label_keeps_its_description() {
+        assert_eq!(
+            readable_label("yszxzttp 43a946c1 \"chain branch A\""),
+            "chain branch A"
+        );
+    }
+
+    #[test]
+    fn a_label_with_neither_role_nor_description_is_left_alone() {
+        let label = "some other label";
+        assert_eq!(readable_label(label), label);
+    }
 }
