@@ -3,6 +3,18 @@ import { render, fireEvent } from "@testing-library/svelte";
 import type { RevsResult } from "./messages/RevsResult";
 import { setupMocks, cleanupMocks } from "./mocks";
 
+/**
+ * The details are in tabs, and the panel opens on the files. Switch to the
+ * tab the test needs.
+ */
+async function showTab(container: HTMLElement, label: string) {
+    let tab = [...container.querySelectorAll<HTMLButtonElement>(".tab")].find((t) =>
+        t.textContent?.includes(label),
+    );
+    expect(tab, `no tab labelled ${label}`).toBeDefined();
+    await fireEvent.click(tab!);
+}
+
 function createMockRevs(
     commitHex = "deadbeef1234",
     changeHex = "abc123def456",
@@ -73,6 +85,9 @@ describe("RevisionPane", () => {
             },
         });
 
+        // the description and its metadata live in their own tab
+        await showTab(container, "说明");
+
         // should display the change id
         expect(container.textContent).toContain("abc123de");
 
@@ -88,12 +103,25 @@ describe("RevisionPane", () => {
         expect(container.textContent).toContain("Test User");
     });
 
+    it("opens on the files tab", async () => {
+        const { default: RevisionPane } = await import("./RevisionPane.svelte");
+
+        const { container } = render(RevisionPane, {
+            props: { revs: createMockRevs() },
+        });
+
+        let active = container.querySelector(".tab.on");
+        expect(active?.textContent).toContain("改动的文件");
+    });
+
     it("preserves an undescribed message when the commit id changes", async () => {
         const { default: RevisionPane } = await import("./RevisionPane.svelte");
 
         let { container, rerender } = render(RevisionPane, {
             props: { revs: createMockRevs() },
         });
+
+        await showTab(container, "说明");
 
         let textarea = container.querySelector("textarea")!;
         textarea.value = "desc";
@@ -108,12 +136,14 @@ describe("RevisionPane", () => {
         const { default: RevisionPane } = await import("./RevisionPane.svelte");
 
         let first = render(RevisionPane, { props: { revs: createMockRevs() } });
+        await showTab(first.container, "说明");
         let textarea = first.container.querySelector("textarea")!;
         textarea.value = "desc";
         await fireEvent.input(textarea);
         first.unmount();
 
         let second = render(RevisionPane, { props: { revs: createMockRevs("feed5678abcd") } });
+        await showTab(second.container, "说明");
 
         expect(second.container.querySelector("textarea")?.value).toBe("desc");
     });
@@ -122,6 +152,7 @@ describe("RevisionPane", () => {
         const { default: RevisionPane } = await import("./RevisionPane.svelte");
 
         let first = render(RevisionPane, { props: { revs: createMockRevs() } });
+        await showTab(first.container, "说明");
         let textarea = first.container.querySelector("textarea")!;
         textarea.value = "desc";
         await fireEvent.input(textarea);
@@ -130,6 +161,7 @@ describe("RevisionPane", () => {
         let second = render(RevisionPane, {
             props: { revs: createMockRevs("feed5678abcd", "999888777666", "Other message") },
         });
+        await showTab(second.container, "说明");
 
         expect(second.container.querySelector("textarea")?.value).toBe("Other message");
     });

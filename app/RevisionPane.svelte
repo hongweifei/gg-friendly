@@ -21,6 +21,7 @@ touches, and the actions that can be taken on it.
     import { onEvent } from "./ipc";
     import AuthorSpan from "./controls/AuthorSpan.svelte";
     import ListWidget, { type List } from "./controls/ListWidget.svelte";
+    import TabBar, { type Tab } from "./controls/TabBar.svelte";
     import type { RevChange } from "./messages/RevChange";
     import TimestampSpan from "./controls/TimestampSpan.svelte";
     import TimestampRangeSpan from "./controls/TimestampRangeSpan.svelte";
@@ -70,6 +71,17 @@ touches, and the actions that can be taken on it.
     $: authors = [...new Map(revs.headers.map((h) => [h.author.email, h.author])).values()];
 
     $: diffStat = formatDiffStat(revs.changes, revs.changes.length + revs.conflicts.length);
+
+    // The details are split into tabs, so the panel stays short however much
+    // there is to read. The files are what people look at most, so that is
+    // where it opens.
+    type TabId = "description" | "parents" | "files";
+    let activeTab: TabId = "files";
+    $: tabs = [
+        { id: "description", label: "说明" },
+        { id: "parents", label: "上一个改动", hint: revs.parents.length > 0 ? `${revs.parents.length}` : undefined },
+        { id: "files", label: "改动的文件", hint: syntheticChanges.length > 0 ? diffStat : undefined },
+    ] as Tab[];
 
     let syntheticChanges = revs.changes
         .concat(
@@ -192,167 +204,170 @@ touches, and the actions that can be taken on it.
     </h2>
 
     <div slot="body" class="body">
-        {#if !singleton}
-            <div class="description-list">
-                {#each revs.headers as header, i}
-                    {#if i > 0}<hr class="description-divider" />{/if}
-                    <div class="description-row">{header.description.lines.join("\n")}</div>
-                {/each}
-            </div>
-        {:else}
-            <textarea
-                class="description"
-                spellcheck="false"
-                disabled={newestImmutable}
-                bind:value={editableDescription}
-                on:dragenter={dragOverWidget}
-                on:dragover={dragOverWidget}
-                on:keydown={(ev) => {
-                    if (descriptionChanged && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
-                        updateDescription();
-                    }
-                }}></textarea>
-        {/if}
+        <TabBar {tabs} bind:active={activeTab} />
 
-        {#if singleton}
-            <div class="signature-commands">
-                <span class="who"><AuthorSpan author={newest.author} /></span>
-                <TimestampSpan timestamp={newest.author.timestamp} />
-                <span class="ids">
-                    <IdSpan selectable id={newest.id.change} />
-                    <IdSpan selectable id={newest.id.commit} />
-                </span>
-                {#if branches.length > 0}
-                    <span class="branches">
-                        {#each branches as branch}
-                            <span class="branch">{branch.label}</span>
-                        {/each}
-                    </span>
-                {/if}
-                {#if unpublished}
-                    <span class="state warn">未上传</span>
-                {:else if published}
-                    <span class="state ok">已上传</span>
-                {/if}
-                {#if newest.has_conflict}
-                    <span class="state danger">有冲突</span>
-                {/if}
-                {#if newest.is_immutable}
-                    <span class="state">已定稿</span>
-                {/if}
-                {#if newest.is_working_copy}
-                    <span class="state ok">正在编辑</span>
-                {/if}
-
-                <span class="spacer"></span>
-
-                <ToggleWidget
-                    safe
-                    secondary
-                    tip="同时把作者改回你自己"
-                    bind:checked={resetAuthor}
-                    disabled={newestImmutable}
-                    on="unlock"
-                    off="lock" />
-                <ActionWidget
-                    tip="保存这段说明"
-                    onClick={() => mutator.onDescribe(editableDescription, resetAuthor)}
-                    disabled={newestImmutable || !descriptionChanged}>
-                    <Icon name="file-text" /> 保存说明
-                </ActionWidget>
-            </div>
-        {:else}
-            <div class="signature-commands">
-                <span>作者：</span>
-                <span>
-                    {#each authors as author, ix}
-                        <!-- prettier-ignore -->
-                        <AuthorSpan {author} />{#if ix < authors.length - 1},&nbsp;
-                        {/if}
-                    {/each}
-                </span>
-                <TimestampRangeSpan from={firstTimestamp} to={lastTimestamp} />
-            </div>
-        {/if}
-
-        {#if revs.parents.length > 0}            <section class="section">
-                <h3 class="section-h">上一个改动</h3>
-                <Zone operand={{ type: "Merge", header: oldest }} let:target>
-                    <div class="parents" class:target>
-                        {#each revs.parents as parent}
-                            <div class="parent">
-                                <RevisionObject header={parent} child={oldest} selected={false} noBookmarks />
-                            </div>
+        {#if activeTab == "description"}
+            <div class="tab-body description-body">
+                {#if !singleton}
+                    <div class="description-list">
+                        {#each revs.headers as header, i}
+                            {#if i > 0}<hr class="description-divider" />{/if}
+                            <div class="description-row">{header.description.lines.join("\n")}</div>
                         {/each}
                     </div>
-                </Zone>
-            </section>
-        {/if}
+                {:else}
+                    <textarea
+                        class="description"
+                        spellcheck="false"
+                        disabled={newestImmutable}
+                        bind:value={editableDescription}
+                        on:dragenter={dragOverWidget}
+                        on:dragover={dragOverWidget}
+                        on:keydown={(ev) => {
+                            if (descriptionChanged && ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)) {
+                                updateDescription();
+                            }
+                        }}></textarea>
+                {/if}
 
-        <section class="section files-section">
-            <h3 class="section-h">
-                改动的文件
-                <span class="stat">{diffStat}</span>
-            </h3>
+                {#if singleton}
+                    <div class="signature-commands">
+                        <span class="who"><AuthorSpan author={newest.author} /></span>
+                        <TimestampSpan timestamp={newest.author.timestamp} />
+                        <span class="ids">
+                            <IdSpan selectable id={newest.id.change} />
+                            <IdSpan selectable id={newest.id.commit} />
+                        </span>
+                        {#if branches.length > 0}
+                            <span class="branches">
+                                {#each branches as branch}
+                                    <span class="branch">{branch.label}</span>
+                                {/each}
+                            </span>
+                        {/if}
+                        {#if unpublished}
+                            <span class="state warn">未上传</span>
+                        {:else if published}
+                            <span class="state ok">已上传</span>
+                        {/if}
+                        {#if newest.has_conflict}
+                            <span class="state danger">有冲突</span>
+                        {/if}
+                        {#if newest.is_immutable}
+                            <span class="state">已定稿</span>
+                        {/if}
+                        {#if newest.is_working_copy}
+                            <span class="state ok">正在编辑</span>
+                        {/if}
 
-            {#if syntheticChanges.length > 0}
-                <div class="move-commands">
-                    <ActionWidget
-                        tip="把这个改动的所有内容并进上一个改动"
-                        onClick={mutator.onSquash}
-                        disabled={oldestImmutable || oldest.parent_ids.length != 1}>
-                        <Icon name="upload" /> 合并到上一个
-                    </ActionWidget>
+                        <span class="spacer"></span>
 
-                    {#if singleton}
+                        <ToggleWidget
+                            safe
+                            secondary
+                            tip="同时把作者改回你自己"
+                            bind:checked={resetAuthor}
+                            disabled={newestImmutable}
+                            on="unlock"
+                            off="lock" />
                         <ActionWidget
-                            tip="把上一个改动里被删掉的内容恢复回来"
-                            onClick={mutator.onRestore}
-                            disabled={newestImmutable || newest.parent_ids.length != 1}>
-                            <Icon name="download" /> 从上一个恢复
+                            tip="保存这段说明"
+                            onClick={() => mutator.onDescribe(editableDescription, resetAuthor)}
+                            disabled={newestImmutable || !descriptionChanged}>
+                            <Icon name="file-text" /> 保存说明
                         </ActionWidget>
-                    {/if}
-                </div>
-
-                <div class="files-and-diff">
-                    <ListWidget {list} type="Change" descendant={$changeSelectEvent?.path.repo_path}>
-                        <div class="changes">
-                            {#each syntheticChanges as change}
-                                <ChangeObject {change} headers={revs.headers} selected={false} />
+                    </div>
+                {:else}
+                    <div class="signature-commands">
+                        <span>作者：</span>
+                        <span>
+                            {#each authors as author, ix}
+                                <!-- prettier-ignore -->
+                                <AuthorSpan {author} />{#if ix < authors.length - 1},&nbsp;
+                                {/if}
+                            {/each}
+                        </span>
+                        <TimestampRangeSpan from={firstTimestamp} to={lastTimestamp} />
+                    </div>
+                {/if}
+            </div>
+        {:else if activeTab == "parents"}
+            <div class="tab-body parents-body">
+                {#if revs.parents.length > 0}
+                    <Zone operand={{ type: "Merge", header: oldest }} let:target>
+                        <div class="parents" class:target>
+                            {#each revs.parents as parent}
+                                <div class="parent">
+                                    <RevisionObject header={parent} child={oldest} selected={false} noBookmarks />
+                                </div>
                             {/each}
                         </div>
-                    </ListWidget>
+                    </Zone>
+                {:else}
+                    <p class="note">这个改动没有上一个改动。</p>
+                {/if}
+            </div>
+        {:else}
+            <div class="tab-body files-body">
+                {#if syntheticChanges.length > 0}
+                    <div class="move-commands">
+                        <ActionWidget
+                            tip="把这个改动的所有内容并进上一个改动"
+                            onClick={mutator.onSquash}
+                            disabled={oldestImmutable || oldest.parent_ids.length != 1}>
+                            <Icon name="upload" /> 合并到上一个
+                        </ActionWidget>
 
-                    <div class="diff-pane">
-                        {#each syntheticChanges as change}
-                            {#if $changeSelectEvent?.path?.repo_path === change.path.repo_path}
-                                <div class="diff-head">
-                                    <span class="kind {change.has_conflict ? "danger" : change.kind.toLowerCase()}">
-                                        {change.has_conflict
-                                            ? "冲突"
-                                            : fileChangeLabel(change.kind)}
-                                    </span>
-                                    <span class="grow"></span>
-                                    <span class="hint">内容变化</span>
-                                </div>
-                                <div class="change" style="--lines: {minLines(change)}" tabindex="-1">
-                                    {#each change.hunks as hunk}
-                                        <div class="hunk">
-                                            <HunkObject header={singleton ? newest : null} path={change.path} {hunk} />
-                                        </div>
-                                        <pre class="diff">{#each hunk.lines.lines as line}<span class={lineColour(line)}
-                                                    ><span class="prefix">{line.slice(0, 1)}</span>{line.slice(1)}</span
-                                                >{/each}</pre>
-                                    {/each}
-                                </div>
-                            {/if}
-                        {/each}
+                        {#if singleton}
+                            <ActionWidget
+                                tip="把上一个改动里被删掉的内容恢复回来"
+                                onClick={mutator.onRestore}
+                                disabled={newestImmutable || newest.parent_ids.length != 1}>
+                                <Icon name="download" /> 从上一个恢复
+                            </ActionWidget>
+                        {/if}
                     </div>
-                </div>
-            {:else}
-                <p class="no-changes">这个改动还没有改动任何文件。</p>
-            {/if}
-        </section>
+
+                    <div class="files-and-diff">
+                        <ListWidget {list} type="Change" descendant={$changeSelectEvent?.path.repo_path}>
+                            <div class="changes">
+                                {#each syntheticChanges as change}
+                                    <ChangeObject {change} headers={revs.headers} selected={false} />
+                                {/each}
+                            </div>
+                        </ListWidget>
+
+                        <div class="diff-pane">
+                            {#each syntheticChanges as change}
+                                {#if $changeSelectEvent?.path?.repo_path === change.path.repo_path}
+                                    <div class="diff-head">
+                                        <span class="kind {change.has_conflict ? "danger" : change.kind.toLowerCase()}">
+                                            {change.has_conflict
+                                                ? "冲突"
+                                                : fileChangeLabel(change.kind)}
+                                        </span>
+                                        <span class="grow"></span>
+                                        <span class="hint">内容变化</span>
+                                    </div>
+                                    <div class="change" style="--lines: {minLines(change)}" tabindex="-1">
+                                        {#each change.hunks as hunk}
+                                            <div class="hunk">
+                                                <HunkObject header={singleton ? newest : null} path={change.path} {hunk} />
+                                            </div>
+                                            <pre class="diff">{#each hunk.lines.lines as line}<span class={lineColour(line)}
+                                                        ><span class="prefix">{line.slice(0, 1)}</span>{line.slice(1)}</span
+                                                    >{/each}</pre>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            {/each}
+                        </div>
+                    </div>
+                {:else}
+                    <p class="note">这个改动还没有改动任何文件。</p>
+                {/if}
+            </div>
+        {/if}
     </div>
 </Pane>
 
@@ -389,6 +404,35 @@ touches, and the actions that can be taken on it.
         margin: 0 -6px -3px -6px;
         padding: 0 6px 3px 6px;
         gap: 0;
+    }
+
+    /* what a tab shows */
+    .tab-body {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .description-body {
+        overflow: auto;
+    }
+
+    .parents-body {
+        overflow: auto;
+        padding-top: 4px;
+    }
+
+    .files-body {
+        overflow: hidden;
+    }
+
+    .note {
+        margin: 0;
+        padding: 16px 4px;
+        font-size: 12.5px;
+        color: var(--ctp-subtext1);
     }
 
     /* the description is a single line of context, the files and the diff
@@ -497,30 +541,6 @@ touches, and the actions that can be taken on it.
         flex: 1;
     }
 
-    .section {
-        border-top: 1px solid var(--ctp-overlay0);
-        padding: 12px 3px 0 3px;
-        flex-shrink: 0;
-    }
-
-    .files-section {
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        flex: 1;
-    }
-
-    .section-h {
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.4px;
-        color: var(--ctp-subtext1);
-        margin-bottom: 9px;
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-    }
-
     .stat {
         font-weight: 400;
         font-size: 11.5px;
@@ -605,7 +625,6 @@ touches, and the actions that can be taken on it.
 
     .parents {
         padding: 0 3px;
-        max-height: 34px;
         overflow: auto;
     }
 
@@ -616,13 +635,8 @@ touches, and the actions that can be taken on it.
     .move-commands {
         display: flex;
         gap: 6px;
-        margin-bottom: 8px;
-    }
-
-    .no-changes {
-        font-size: 13.5px;
-        color: var(--ctp-subtext1);
-        margin: 0 0 8px;
+        padding: 8px 3px 0 3px;
+        flex: none;
     }
 
     .changes {

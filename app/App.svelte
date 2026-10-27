@@ -273,18 +273,18 @@
 
     .main {
         display: grid;
-        /* the change list gets a third of the height, the files and the diff
-           below it get the rest */
-        grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1.6fr);
+        /* the change list and the details below it share the height evenly;
+           the details are in tabs, so they don't need more room than that */
+        grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1fr);
         overflow: hidden;
         min-width: 0;
     }
 
     .detail {
         display: grid;
-        /* the pending files take a slice of the height, the selected change's
-           details get the rest */
-        grid-template-rows: minmax(0, 0.7fr) 1px minmax(0, 1.6fr);
+        /* the pending files take only the room they need, up to a third, and
+           the selected change's details get the rest */
+        grid-template-rows: minmax(0, auto) 1px minmax(0, 1fr);
         overflow: hidden;
         min-height: 0;
     }

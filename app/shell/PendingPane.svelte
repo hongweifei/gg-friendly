@@ -117,6 +117,9 @@ often, so it stays on screen instead of behind a selection.
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);
         min-height: 0;
+        /* the file list scrolls rather than growing, so the panel below keeps
+           its room */
+        max-height: 30vh;
         border-bottom: 1px solid var(--ctp-surface0);
         background: var(--ctp-base);
     }
